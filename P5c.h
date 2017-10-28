@@ -3,6 +3,9 @@
 //
 
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wreturn-stack-address"
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 #ifndef P5C_H
 #define P5C_H
@@ -29,6 +32,15 @@ void background(int r, int g, int b, int a);
 void handleResize(int w, int h);
 void ellipse(float x, float y, float w, float h);
 void rect(float x, float y, float w, float h);
+void popMatrix();
+void pushMatrix();
+void translate(int x, int y, int z);
+void keyPressed();
+void keyReleased();
+void mouseClicked();
+void mouseReleased();
+void handleMousePos(int x, int y);
+
 
 // Classes
 class Color{
@@ -37,6 +49,27 @@ public:
     float g;
     float b;
     float a;
+
+    Color() = default{
+        r = 0;
+        g = 0;
+        b = 0;
+        a = 255;
+    }
+
+    explicit Color(float shade){
+        r = shade;
+        g = shade;
+        b = shade;
+        a = 255;
+    }
+
+    Color(float r_, float g_, float b_){
+        r = r_;
+        g = g_;
+        b = b_;
+        a = 255;
+    }
 
     Color(float r_, float g_, float b_, float a_){
         r = r_;
@@ -47,9 +80,15 @@ public:
 };
 class PVector {
 public:
-    float x;
-    float y;
-    float z;
+    float x = 0;
+    float y = 0;
+    float z = 0;
+
+    PVector() = default{
+        x = 0;
+        y = 0;
+        z = 0;
+    }
 
     PVector(float x_, float y_, float z_ = 0) {
         x = x_;
@@ -96,22 +135,51 @@ public:
         z/=dv;
     }
     void normalize(){
-        float a = sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
+        float a = static_cast<float>(sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2)));
         x = x/a;
         y = y/a;
         z = z/a;
     }
 };
 
+class PImage{
+public:
+    Color *pixels;
+    int width;
+    int height;
+
+    PImage() = default{
+        pixels = new Color(51);
+    }
+
+    PImage(int width_, int height_){
+        free(pixels);
+        width = width_;
+        height = height_;
+        Color tmppixels[width*height];
+        std::fill_n(tmppixels, width*height, Color(255, 255, 255, 255));
+        for(int i = 0; i < width*height; i++){
+            tmppixels[i] = Color(255, 255, 255, 255);
+        }
+        pixels = tmppixels;
+    }
+
+};
+
 // Variables
 int width;
 int height;
 int window;
-int strokeweight;
-Color strokeCol = Color(255, 255, 255, 255);
-Color fillCol = Color(255, 255, 255, 255);
+int key;
+int keyCode;
+int mouseX;
+int mouseY;
+int mouseButton;
+int strokeweight = 1;
+Color strokeCol;
+Color fillCol;
 int counter = 0;
-PVector lastver = PVector(0,0,0);
+PVector lastver;
 bool translated = false;
 
 
@@ -119,15 +187,19 @@ int framerate = 60;
 int timeToWait;
 long curTime;
 char *title = nullptr;
-Color last(0, 0, 0, 255);
+Color last;
 
 
 int main() {
+    strokeCol = Color(255, 255, 255, 255);
+    fillCol = Color(0, 0, 0, 255);
+    lastver = PVector(0,0,0);
     setup();
-    srand(time(NULL));
     glutMainLoop();
     timeToWait = int(float(1000) / framerate);
     curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    srand(static_cast<unsigned int>(curTime));
+    //display();
 //    while (true) {
 //        if (std::chrono::duration_cast<std::chrono::milliseconds>(
 //                std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
@@ -160,7 +232,37 @@ void size(int w_, int h_) {
     //glutSwapBuffers();
     //glutDisplayFunc(display);
     glutReshapeFunc(handleResize);
+    glutKeyboardFunc(handleKeypress);
+    glutKeyboardUpFunc(handleKeyrelease);
+    glutMotionFunc(handleMousePos);
+    glutPassiveMotionFunc(handleMousePos);
     //background(last.r, last.g, last.b, last.a);
+}
+
+void handleMousePress(int button, int state, int x, int y){
+    mouseX = x;
+    mouseY = y;
+    mouseButton = button;
+    if(state == GLUT_DOWN){
+        mouseClicked();
+    }else{
+        mouseReleased();
+    }
+}
+
+void handleMousePos(int x, int y){
+    mouseX = x;
+    mouseY = y;
+}
+
+void handleKeypress(unsigned char input, int x, int y){
+    key = input;
+    keyPressed();
+}
+
+void handleKeyrelease(unsigned char input, int x, int y){
+    key = input;
+    keyReleased();
 }
 
 void handleResize(int w, int h) {
@@ -205,9 +307,9 @@ void display() {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
             curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
+            //glPushMatrix();
             draw();
-            glPopMatrix();
+            //glPopMatrix();
             glFlush();
         }
     }
@@ -226,7 +328,6 @@ void background(int r, int g = 256, int b = 256, int a = 255) {
     glDrawBuffer(GL_FRONT_AND_BACK);
     glClearColor(tmpr, tmpg, tmpb, tmpa);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glFlush();
 }
 
 void beginShape(GLenum shape = 0) {
@@ -269,7 +370,7 @@ void ellipse(float x, float y_, float w, float h) {
     glBegin(GL_LINE_LOOP);
     for (int i = 0; i < 360; i++) {
         double rad = i * M_PI / 180;
-        glVertex2d(cos(rad) * w, sin(rad) * h);
+        glVertex2d(std::cos(rad) * w, std::sin(rad) * h);
     }
     glEnd();
     glPopMatrix();
@@ -302,7 +403,18 @@ void rect(float x, float y_, float w, float h) {
 }
 
 void point(float x, float y){
-    ellipse(x, y, strokeweight, strokeweight);
+    y = map(y, 0, height, height, 0);
+    glPushMatrix();
+    glTranslated(x, y, 0);
+    glColor4f(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
+    // Draw ellipse
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 360; i++) {
+        double rad = i * M_PI / 180;
+        glVertex2d(cos(rad) * strokeweight, sin(rad) * strokeweight);
+    }
+    glEnd();
+    glPopMatrix();
 }
 
 void line(float x1, float y1, float x2, float y2){
@@ -337,14 +449,45 @@ void fill(int r, int g = 256, int b = 256, int a = 255){
     fillCol = Color(map(r, 0, 255, 0,1), map(g, 0, 255, 0,1), map(b, 0, 255, 0,1), map(a, 0, 255, 0,1));
 }
 
+void image(PImage img, int x, int y){
+    pushMatrix();
+    //y = map(y, 0, height, height, 0);
+    translate(x, y, 0);
+    for(int i = 0; i < img.height; i++){
+        for(int j = 0; j < img.width; j++){
+            //std::cout<<"Drawing pixel at "<<i<<","<<j<<std::endl;
+            Color tmp = img.pixels[i*img.width+j];
+            fill(static_cast<int>(tmp.r), static_cast<int>(tmp.g), static_cast<int>(tmp.b), static_cast<int>(tmp.a));
+            rect(i, j, 1, 1);
+        }
+    }
+    popMatrix();
+}
+
 // Math Functions
 
 float map(float n, float min1, float max1, float min2, float max2) {
     return min2 + (max2 - min2) * ((n - min1) / (max1 - min1));
 }
 
-float random(int min, int max){
-    return rand()%(max-min)+min;
+float random(int min, int max = 0){
+    tm localTime{};
+    std::chrono::system_clock::time_point t = std::chrono::system_clock::now();
+    time_t now = std::chrono::system_clock::to_time_t(t);
+    localtime_r(&now, &localTime);
+
+    const std::chrono::duration<double> tse = t.time_since_epoch();
+    std::chrono::seconds::rep milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
+    srand(static_cast<unsigned int>(milliseconds + int(rand() % 100)));
+    //max++;
+    //float random = rand()%(max-min)+min;
+    if(min > max){
+        max = min;
+        min = 0;
+    }
+    float random = min + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(max-min))); // NOLINT
+    //std::cout<<"Random value is: "<<random<<std::endl;
+    return random;
 }
 
 double dist(float a1, float a2, float a3, float a4, float a5 = NULL, float a6 = NULL){
@@ -373,7 +516,6 @@ void popMatrix(){
 }
 
 // Much appreciated functions
-
 
 // Classes
 
