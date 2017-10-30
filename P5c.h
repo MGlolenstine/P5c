@@ -18,6 +18,12 @@ const int CLOSE = 1;
 #include <cmath>
 #include <iostream>
 #include <cstring>
+#include <vector>
+#include <cstdlib>
+#include <malloc.h>
+#include <unistd.h>
+#include <sys/param.h>
+#include <libgen.h>
 
 // Functions
 void draw();
@@ -39,39 +45,49 @@ void keyPressed();
 void keyReleased();
 void mouseClicked();
 void mouseReleased();
+void handleKeypress(unsigned char input, int x, int y);
+void handleKeyrelease(unsigned char input, int x, int y);
 void handleMousePos(int x, int y);
 
+
+void endShape(GLenum close = 0) ;
+
+void beginShape(GLenum shape = 0) ;
+
+std::string getPath() ;
+
+std::string getFolder(std::string fullPath);
 
 // Classes
 class Color{
 public:
-    float r;
-    float g;
-    float b;
-    float a;
+    int r;
+    int g;
+    int b;
+    int a;
 
-    Color() = default{
+    Color(){
         r = 0;
         g = 0;
         b = 0;
         a = 255;
     }
 
-    explicit Color(float shade){
+    explicit Color(int shade){
         r = shade;
         g = shade;
         b = shade;
         a = 255;
     }
 
-    Color(float r_, float g_, float b_){
+    Color(int r_, int g_, int b_){
         r = r_;
         g = g_;
         b = b_;
         a = 255;
     }
 
-    Color(float r_, float g_, float b_, float a_){
+    Color(int r_, int g_, int b_, int a_){
         r = r_;
         g = g_;
         b = b_;
@@ -84,7 +100,7 @@ public:
     float y = 0;
     float z = 0;
 
-    PVector() = default{
+    PVector(){
         x = 0;
         y = 0;
         z = 0;
@@ -124,18 +140,18 @@ public:
         y = random(-1, 1);
         z = random(-1, 1);
     }
-    void mult(int mg){
+    void mult(float mg){
         x*=mg;
         y*=mg;
         z*=mg;
     }
-    void div(int dv){
+    void div(float dv){
         x/=dv;
         y/=dv;
         z/=dv;
     }
     void normalize(){
-        float a = static_cast<float>(sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2)));
+        auto a = float(sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2)));
         x = x/a;
         y = y/a;
         z = z/a;
@@ -144,26 +160,49 @@ public:
 
 class PImage{
 public:
-    Color *pixels;
+    std::vector<Color> pixels;
     int width;
     int height;
 
-    PImage() = default{
-        pixels = new Color(51);
+    PImage(){
+        width = 64;
+        height = 64;
+        Color tmppixels[width*height];
+        std::fill_n(tmppixels, width*height, Color(255, 255, 255, 255));
+        for(Color c : tmppixels){
+            pixels.push_back(c);
+        }
     }
 
     PImage(int width_, int height_){
-        free(pixels);
         width = width_;
         height = height_;
         Color tmppixels[width*height];
         std::fill_n(tmppixels, width*height, Color(255, 255, 255, 255));
-        for(int i = 0; i < width*height; i++){
-            tmppixels[i] = Color(255, 255, 255, 255);
+        for(Color c : tmppixels){
+            pixels.push_back(c);
         }
-        pixels = tmppixels;
     }
 
+    PImage(int width_, int height_, int r_, int g_, int b_){
+        width = width_;
+        height = height_;
+        Color tmppixels[width*height];
+        std::fill_n(tmppixels, width*height, Color(r_, g_, b_, 255));
+        for(Color c : tmppixels){
+            pixels.push_back(c);
+        }
+    }
+
+    PImage(int width_, int height_, int r_, int g_, int b_, int a_){
+        width = width_;
+        height = height_;
+        Color tmppixels[width*height];
+        std::fill_n(tmppixels, width*height, Color(r_, g_, b_, a_));
+        for(Color c : tmppixels){
+            pixels.push_back(c);
+        }
+    }
 };
 
 // Variables
@@ -176,21 +215,23 @@ int mouseX;
 int mouseY;
 int mouseButton;
 int strokeweight = 1;
-Color strokeCol;
-Color fillCol;
+Color strokeCol; // NOLINT
+Color fillCol; // NOLINT
 int counter = 0;
-PVector lastver;
+PVector lastver; // NOLINT
 bool translated = false;
-
+std::string path = "";
 
 int framerate = 60;
 int timeToWait;
 long curTime;
 char *title = nullptr;
-Color last;
+Color last; // NOLINT
 
 
 int main() {
+    //std::cout<<"Path: "<<getPath()<<std::endl;
+    path = getPath();
     strokeCol = Color(255, 255, 255, 255);
     fillCol = Color(0, 0, 0, 255);
     lastver = PVector(0,0,0);
@@ -199,16 +240,6 @@ int main() {
     timeToWait = int(float(1000) / framerate);
     curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     srand(static_cast<unsigned int>(curTime));
-    //display();
-//    while (true) {
-//        if (std::chrono::duration_cast<std::chrono::milliseconds>(
-//                std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
-//            curTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-//                    std::chrono::system_clock::now().time_since_epoch()).count();
-//            draw();
-//            //display();
-//        }
-//    }
 }
 
 // Window related functions
@@ -220,23 +251,18 @@ void size(int w_, int h_) {
     int myargc = 1;
     myargv[0] = strdup("Untitled");
     glutInit(&myargc, myargv);
-//    glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL | GLUT_DOUBLE);
-    glutInitDisplayMode(GLUT_RGBA);
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL);
     glutInitWindowSize(width, height);
-    //std::cout << "Set display function" << std::endl;
     if (title == nullptr) {
         window = glutCreateWindow(myargv[0]);
     } else {
         window = glutCreateWindow(strdup(title));
     }
-    //glutSwapBuffers();
-    //glutDisplayFunc(display);
     glutReshapeFunc(handleResize);
     glutKeyboardFunc(handleKeypress);
     glutKeyboardUpFunc(handleKeyrelease);
     glutMotionFunc(handleMousePos);
     glutPassiveMotionFunc(handleMousePos);
-    //background(last.r, last.g, last.b, last.a);
 }
 
 void handleMousePress(int button, int state, int x, int y){
@@ -277,11 +303,6 @@ void handleResize(int w, int h) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     display();
-//    glClearColor(map(last.r, 0, 255, 0, 1), map(last.g, 0, 255, 0, 1), map(last.b, 0, 255, 0, 1), map(last.a, 0, 255, 0, 1));
-//    glClear(GL_COLOR_BUFFER_BIT);
-    //glutSwapBuffers();
-    //std::cout<<"Handling resize!"<<std::endl;
-    //glFlush();
 }
 
 void name(char *s) {
@@ -301,15 +322,11 @@ void display() {
         frameRate(framerate);
         translated = true;
     }
-//    glEnable(GL_BLEND);
-//    glShadeModel(GL_SMOOTH);
     while(true) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
             curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             glMatrixMode(GL_MODELVIEW);
-            //glPushMatrix();
             draw();
-            //glPopMatrix();
             glFlush();
         }
     }
@@ -330,12 +347,12 @@ void background(int r, int g = 256, int b = 256, int a = 255) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void beginShape(GLenum shape = 0) {
+void beginShape(GLenum shape) {
     glBegin(shape);
     counter = 0;
 }
 
-void endShape(GLenum close = 0) {
+void endShape(GLenum close) {
     if(close == 1) {
         glVertex3d(lastver.x, lastver.y, lastver.z);
     }
@@ -352,8 +369,8 @@ void vertex(float x, float y, float z = 0) {
     glVertex3d(x, y, z);
 }
 
-void ellipse(float x, float y_, float w, float h) {
-    float y = map(y_, 0, height, height, 0);
+void ellipse(float x, float y, float w, float h) {
+    y = map(y, 0, height, height, 0);
     glPushMatrix();
     glTranslated(x, y, 0);
     glColor4f(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
@@ -376,8 +393,8 @@ void ellipse(float x, float y_, float w, float h) {
     glPopMatrix();
 }
 
-void rect(float x, float y_, float w, float h) {
-    float y = map(y_, 0, height, height, 0);
+void rect(float x, float y, float w, float h) {
+    y = map(y, 0, height, height, 0);
     h = -h;
     glPushMatrix();
     glTranslated(x, y, 0);
@@ -421,7 +438,7 @@ void line(float x1, float y1, float x2, float y2){
     y1 = map(y1, 0, height, height, 0);
     y2 = map(y2, 0, height, height, 0);
     glLineWidth(strokeweight);
-    glColor4f(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
+    glColor4d(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
     glBegin(GL_LINES);
         glVertex2d(x1, y1);
         glVertex2d(x2, y2);
@@ -438,7 +455,7 @@ void stroke(int r, int g = 256, int b = 256, int a = 255){
         b = r;
     }
     //strokeCol = Color(r, g, b, a);
-    strokeCol = Color(map(r, 0, 255, 0,1), map(g, 0, 255, 0,1), map(b, 0, 255, 0,1), map(a, 0, 255, 0,1));
+    strokeCol = Color(r, g, b, a);
 }
 
 void fill(int r, int g = 256, int b = 256, int a = 255){
@@ -446,21 +463,40 @@ void fill(int r, int g = 256, int b = 256, int a = 255){
         g = r;
         b = r;
     }
-    fillCol = Color(map(r, 0, 255, 0,1), map(g, 0, 255, 0,1), map(b, 0, 255, 0,1), map(a, 0, 255, 0,1));
+    fillCol = Color(r, g, b, a);
 }
 
 void image(PImage img, int x, int y){
+    y = height-y;
     pushMatrix();
-    //y = map(y, 0, height, height, 0);
-    translate(x, y, 0);
-    for(int i = 0; i < img.height; i++){
-        for(int j = 0; j < img.width; j++){
-            //std::cout<<"Drawing pixel at "<<i<<","<<j<<std::endl;
-            Color tmp = img.pixels[i*img.width+j];
-            fill(static_cast<int>(tmp.r), static_cast<int>(tmp.g), static_cast<int>(tmp.b), static_cast<int>(tmp.a));
-            rect(i, j, 1, 1);
-        }
+    int texDat[img.height*img.width];
+    for (int i = 0; i < img.height*img.width; i++) {
+        Color col = img.pixels.at(static_cast<unsigned long>(i));
+        int r = col.r;
+        int g = col.g;
+        int b = col.b;
+        texDat[i] = (r << 16) | (g << 8) | b;
     }
+
+    //upload to GPU texture
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texDat);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glEnable(GL_TEXTURE_2D);
+    glBegin(GL_QUADS);
+        glTexCoord2i(0, 0); glVertex2i(x, y);
+        glTexCoord2i(0, 1); glVertex2i(x, y-img.height);
+        glTexCoord2i(1, 1); glVertex2i(x+img.width,y-img.height);
+        glTexCoord2i(1, 0); glVertex2i(x+img.width, y);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, 0);
     popMatrix();
 }
 
@@ -478,7 +514,7 @@ float random(int min, int max = 0){
 
     const std::chrono::duration<double> tse = t.time_since_epoch();
     std::chrono::seconds::rep milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
-    srand(static_cast<unsigned int>(milliseconds + int(rand() % 100)));
+    srand(static_cast<unsigned int>(milliseconds + rand() % 100)); // NOLINT
     //max++;
     //float random = rand()%(max-min)+min;
     if(min > max){
@@ -517,8 +553,83 @@ void popMatrix(){
 
 // Much appreciated functions
 
+std::string getPath() {
+    // Windows
+//    int bytes = GetModuleFileName(NULL, pBuf, len);
+//    if (bytes == 0)
+//        return -1;
+//    else
+//        return bytes;
+//
+    // Linux
+//    char szTmp[32];
+//    char pBuf[256]; size_t len = sizeof(pBuf);
+//    sprintf(szTmp, "/proc/%d/exe", getpid());
+//    std::cout<<"PID:"<<getpid()<<std::endl;
+//    //sprintf(szTmp, "/proc/self/exe");
+//    int bytes = MIN(readlink(szTmp, pBuf, len), len - 1);
+//    if(bytes >= 0)
+//        pBuf[bytes] = '\0';
+//    return bytes;
+    char result[ PATH_MAX ];
+    ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+    std::string final = std::string(result, (count > 0) ? count : 0);
+    return getFolder(final);
+}
+
+std::string getFolder(std::string fullPath){
+    //std::string split[] = strtok(fullPath, "/");
+    char sep = '/';
+    std::string s= fullPath.substr(1);
+    int length = 0;
+    for(size_t p=0, q=0; p!=s.npos; p=q) {
+        //std::cout << s.substr(p+(p!=0), (q=s.find(sep, p+1))-p-(p!=0)) << std::endl;
+        length = int(s.substr(p+(p!=0), (q=s.find(sep, p+1))-p-(p!=0)).length());
+    }
+    std::string final = fullPath.substr(1, fullPath.length()-length);
+    return fullPath.substr(0, fullPath.length()-length);
+}
+
+std::string sketchDirectory(const char input[] = ""){
+    std::string tmp = path;
+    tmp += input;
+//    int i = 0;
+//    while(input[i] != '\0'){
+//        tmp.push_back(input[i]);
+//        std::cout<<"Adding "<<input[i]<<" to the end of the path."<<std::endl;
+//        i++;
+//    }
+    return tmp;
+}
+
+std::string dataDirectory(const char input[] = ""){
+    std::string tmp = path;
+    int i = 0;
+    tmp += "data/";
+    tmp.operator+=(input);
+//    while(input[i] != '\0'){
+//        tmp.push_back(input[i]);
+//        std::cout<<"Adding "<<input[i]<<" to the end of the path."<<std::endl;
+//        i++;
+//    }
+    return tmp;
+}
+
 // Classes
 
 
+// Placeholders
+void mouseClicked(){
+
+}
+void mouseReleased(){
+
+}
+void keyPressed(){
+
+}
+void keyReleased(){
+
+}
 #endif //P5C_H
 #pragma clang diagnostic pop
