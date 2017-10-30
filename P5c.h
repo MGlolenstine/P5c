@@ -7,6 +7,11 @@
 #pragma clang diagnostic ignored "-Wreturn-stack-address"
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
+#pragma weak keyPressed
+#pragma weak keyReleased
+#pragma weak mouseClicked
+#pragma weak mouseReleased
+
 #ifndef P5C_H
 #define P5C_H
 
@@ -41,12 +46,16 @@ void rect(float x, float y, float w, float h);
 void popMatrix();
 void pushMatrix();
 void translate(int x, int y, int z);
-void keyPressed();
-void keyReleased();
-void mouseClicked();
-void mouseReleased();
+
+// Event functions
+void (*kp)() = NULL;
+void (*kr)() = NULL;
+void (*mc)() = NULL;
+void (*mr)() = NULL;
+
 void handleKeypress(unsigned char input, int x, int y);
 void handleKeyrelease(unsigned char input, int x, int y);
+void handleMousePress(int button, int state, int x, int y);
 void handleMousePos(int x, int y);
 
 
@@ -157,7 +166,6 @@ public:
         z = z/a;
     }
 };
-
 class PImage{
 public:
     std::vector<Color> pixels;
@@ -220,7 +228,7 @@ Color fillCol; // NOLINT
 int counter = 0;
 PVector lastver; // NOLINT
 bool translated = false;
-std::string path = "";
+std::string path = ""; // NOLINT
 
 int framerate = 60;
 int timeToWait;
@@ -263,6 +271,7 @@ void size(int w_, int h_) {
     glutKeyboardUpFunc(handleKeyrelease);
     glutMotionFunc(handleMousePos);
     glutPassiveMotionFunc(handleMousePos);
+    glutMouseFunc(handleMousePress);
 }
 
 void handleMousePress(int button, int state, int x, int y){
@@ -270,9 +279,11 @@ void handleMousePress(int button, int state, int x, int y){
     mouseY = y;
     mouseButton = button;
     if(state == GLUT_DOWN){
-        mouseClicked();
+        if(mc != NULL)
+            (*mc)();
     }else{
-        mouseReleased();
+        if(mr != NULL)
+            (*mr)();
     }
 }
 
@@ -283,12 +294,14 @@ void handleMousePos(int x, int y){
 
 void handleKeypress(unsigned char input, int x, int y){
     key = input;
-    keyPressed();
+    if(kp != NULL)
+        (*kp)();
 }
 
 void handleKeyrelease(unsigned char input, int x, int y){
     key = input;
-    keyReleased();
+    if(kr != NULL)
+        (*kr)();
 }
 
 void handleResize(int w, int h) {
@@ -302,7 +315,7 @@ void handleResize(int w, int h) {
     glOrtho(-w / 2, w / 2, -h / 2, h / 2, -1, 1);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    display();
+//    display();
 }
 
 void name(char *s) {
@@ -328,6 +341,7 @@ void display() {
             glMatrixMode(GL_MODELVIEW);
             draw();
             glFlush();
+            glutPostRedisplay();
         }
     }
 }
@@ -373,7 +387,7 @@ void ellipse(float x, float y, float w, float h) {
     y = map(y, 0, height, height, 0);
     glPushMatrix();
     glTranslated(x, y, 0);
-    glColor4f(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
+    glColor4d(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
     // Draw ellipse
     glBegin(GL_POLYGON);
     for (int i = 0; i < 360; i++) {
@@ -382,7 +396,7 @@ void ellipse(float x, float y, float w, float h) {
     }
     glEnd();
     // Draw stroke
-    glColor4f(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
+    glColor4d(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
     glLineWidth(strokeweight);
     glBegin(GL_LINE_LOOP);
     for (int i = 0; i < 360; i++) {
@@ -398,9 +412,8 @@ void rect(float x, float y, float w, float h) {
     h = -h;
     glPushMatrix();
     glTranslated(x, y, 0);
-    //glColor4d(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
     // Draw rect
-    glColor4f(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
+    glColor4d(fillCol.r, fillCol.g, fillCol.b, fillCol.a);
     glBegin(GL_POLYGON);
         glVertex3d(0, 0, 0);
         glVertex3d(0, h, 0);
@@ -408,7 +421,7 @@ void rect(float x, float y, float w, float h) {
         glVertex3d(w, 0, 0);
     glEnd();
     // Draw stroke
-    glColor4f(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
+    glColor4d(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
     glLineWidth(strokeweight);
     glBegin(GL_LINE_LOOP);
         glVertex3d(0, 0, 0);
@@ -423,7 +436,7 @@ void point(float x, float y){
     y = map(y, 0, height, height, 0);
     glPushMatrix();
     glTranslated(x, y, 0);
-    glColor4f(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
+    glColor4d(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
     // Draw ellipse
     glBegin(GL_POLYGON);
     for (int i = 0; i < 360; i++) {
@@ -454,7 +467,6 @@ void stroke(int r, int g = 256, int b = 256, int a = 255){
         g = r;
         b = r;
     }
-    //strokeCol = Color(r, g, b, a);
     strokeCol = Color(r, g, b, a);
 }
 
@@ -478,7 +490,7 @@ void image(PImage img, int x, int y){
         texDat[i] = (r << 16) | (g << 8) | b;
     }
 
-    //upload to GPU texture
+    //upload texture to GPU
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -515,14 +527,11 @@ float random(int min, int max = 0){
     const std::chrono::duration<double> tse = t.time_since_epoch();
     std::chrono::seconds::rep milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
     srand(static_cast<unsigned int>(milliseconds + rand() % 100)); // NOLINT
-    //max++;
-    //float random = rand()%(max-min)+min;
     if(min > max){
         max = min;
         min = 0;
     }
     float random = min + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(max-min))); // NOLINT
-    //std::cout<<"Random value is: "<<random<<std::endl;
     return random;
 }
 
@@ -554,82 +563,72 @@ void popMatrix(){
 // Much appreciated functions
 
 std::string getPath() {
+    std::string final = std::string("");
     // Windows
-//    int bytes = GetModuleFileName(NULL, pBuf, len);
-//    if (bytes == 0)
-//        return -1;
-//    else
-//        return bytes;
-//
+    #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+    int bytes = GetModuleFileName(NULL, pBuf, len);
+    if (bytes == 0)
+        return -1;
+    else
+        return bytes;
+    #endif
     // Linux
-//    char szTmp[32];
-//    char pBuf[256]; size_t len = sizeof(pBuf);
-//    sprintf(szTmp, "/proc/%d/exe", getpid());
-//    std::cout<<"PID:"<<getpid()<<std::endl;
-//    //sprintf(szTmp, "/proc/self/exe");
-//    int bytes = MIN(readlink(szTmp, pBuf, len), len - 1);
-//    if(bytes >= 0)
-//        pBuf[bytes] = '\0';
-//    return bytes;
+    #if ENV_LINUX
     char result[ PATH_MAX ];
     ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
     std::string final = std::string(result, (count > 0) ? count : 0);
+    #endif
     return getFolder(final);
 }
 
 std::string getFolder(std::string fullPath){
-    //std::string split[] = strtok(fullPath, "/");
-    char sep = '/';
-    std::string s= fullPath.substr(1);
-    int length = 0;
-    for(size_t p=0, q=0; p!=s.npos; p=q) {
-        //std::cout << s.substr(p+(p!=0), (q=s.find(sep, p+1))-p-(p!=0)) << std::endl;
-        length = int(s.substr(p+(p!=0), (q=s.find(sep, p+1))-p-(p!=0)).length());
+    if(fullPath.length() > 0) {
+        char sep = '/';
+        std::string s = fullPath.substr(1);
+        int length = 0;
+        for (size_t p = 0, q = 0; p != s.npos; p = q) {
+            length = int(s.substr(p + (p != 0), (q = s.find(sep, p + 1)) - p - (p != 0)).length());
+        }
+        std::string final = fullPath.substr(1, fullPath.length() - length);
+        return fullPath.substr(0, fullPath.length()-length);
     }
-    std::string final = fullPath.substr(1, fullPath.length()-length);
-    return fullPath.substr(0, fullPath.length()-length);
+    return fullPath;
 }
 
 std::string sketchDirectory(const char input[] = ""){
     std::string tmp = path;
     tmp += input;
-//    int i = 0;
-//    while(input[i] != '\0'){
-//        tmp.push_back(input[i]);
-//        std::cout<<"Adding "<<input[i]<<" to the end of the path."<<std::endl;
-//        i++;
-//    }
     return tmp;
 }
 
 std::string dataDirectory(const char input[] = ""){
     std::string tmp = path;
-    int i = 0;
     tmp += "data/";
     tmp.operator+=(input);
-//    while(input[i] != '\0'){
-//        tmp.push_back(input[i]);
-//        std::cout<<"Adding "<<input[i]<<" to the end of the path."<<std::endl;
-//        i++;
-//    }
     return tmp;
 }
 
+// Re-declaration of event functions
+
+void setMouseClicked(void (*fun)(void)){
+    mc = fun;
+}
+
+void setKeyPressed(void (*fun)(void)){
+    kp = fun;
+}
+
+void setKeyReleased(void (*fun)(void)){
+    kp = fun;
+}
+
+void setMouseReleased(void (*fun)(void)) {
+    kp = fun;
+}
 // Classes
 
 
 // Placeholders
-void mouseClicked(){
 
-}
-void mouseReleased(){
-
-}
-void keyPressed(){
-
-}
-void keyReleased(){
-
-}
 #endif //P5C_H
 #pragma clang diagnostic pop
