@@ -22,6 +22,9 @@ const int CLOSE = 1;
 #include <GL/freeglut.h>
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <png.h>
+#include <jpeglib.h>
 #include <cstring>
 #include <vector>
 #include <cstdlib>
@@ -48,6 +51,8 @@ void pushMatrix();
 void translate(int x, int y, int z);
 
 // Event functions
+void (*st)() = NULL;
+void (*dr)() = NULL;
 void (*kp)() = NULL;
 void (*kr)() = NULL;
 void (*mc)() = NULL;
@@ -66,6 +71,8 @@ void beginShape(GLenum shape = 0) ;
 std::string getPath() ;
 
 std::string getFolder(std::string fullPath);
+
+bool endsWith(const char string[], const char check[]);
 
 // Classes
 class Color{
@@ -171,6 +178,7 @@ public:
     std::vector<Color> pixels;
     int width;
     int height;
+    GLint format = GL_RGBA;
 
     PImage(){
         width = 64;
@@ -211,6 +219,24 @@ public:
             pixels.push_back(c);
         }
     }
+
+    void setPixel(int x, int y, int r, int g = 256, int b = 256, int a = 255){
+        if(g > 255 || b > 255){
+            g = r;
+            b = r;
+        }
+        pixels.at(x+y*width) = Color(r, g, b, a);
+//        Color cols[width*height];
+//        int index = 0;
+//        for(Color c : pixels){
+//            cols[index] = c;
+//        }
+//        cols[x+y*width] = Color(r, g, b, a);
+//        pixels.clear();
+//        for(Color c : cols){
+//            pixels.push_back(c);
+//        }
+    }
 };
 
 // Variables
@@ -236,14 +262,20 @@ long curTime;
 char *title = nullptr;
 Color last; // NOLINT
 
+PImage loadPNG(char url[]);
+
+PImage read_png_file(char* file_name) ;
+
+PImage read_png_file1(char name[]);
 
 int main() {
-    //std::cout<<"Path: "<<getPath()<<std::endl;
+    dr = draw;
+    st = setup;
     path = getPath();
     strokeCol = Color(255, 255, 255, 255);
     fillCol = Color(0, 0, 0, 255);
     lastver = PVector(0,0,0);
-    setup();
+    (*st)();
     glutMainLoop();
     timeToWait = int(float(1000) / framerate);
     curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -315,7 +347,7 @@ void handleResize(int w, int h) {
     glOrtho(-w / 2, w / 2, -h / 2, h / 2, -1, 1);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-//    display();
+    display();
 }
 
 void name(char *s) {
@@ -339,7 +371,7 @@ void display() {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
             curTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             glMatrixMode(GL_MODELVIEW);
-            draw();
+            (*dr)();
             glFlush();
             glutPostRedisplay();
         }
@@ -496,7 +528,7 @@ void image(PImage img, int x, int y){
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texDat);
+    glTexImage2D(GL_TEXTURE_2D, 0, img.format, img.width, img.height, 0, img.format, GL_UNSIGNED_BYTE, texDat);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -510,6 +542,404 @@ void image(PImage img, int x, int y){
     glDisable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
     popMatrix();
+}
+
+void image1(PImage img, int x, int y){
+    y = height-y;
+    pushMatrix();
+    for(int i = 0; i < img.height; i++){
+        for(int j = 0; j < img.width; j++){
+            Color col = img.pixels.at(j+i*img.width);
+            std::cout<<"drawing pixel: "<<col.r<<", "<<col.g<<", "<<col.b<<", "<<col.a<<std::endl;
+            fill(col.r, col.g, col.b, 255);
+            rect(j, i, 1, 1);
+        }
+    }
+    popMatrix();
+}
+
+
+PImage loadImage(char url[]){
+    PImage img = PImage();
+    if(endsWith(url, ".png")){
+        // PNG code
+        img = loadPNG(url);
+        //img = read_png_file1(url);
+    }else if(endsWith(url, ".jpg")){
+        // JPG code
+    }
+    return img;
+}
+
+void abort_(const char * s, ...) {
+    va_list args;
+    va_start(args, s);
+    vfprintf(stderr, s, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+    abort();
+}
+
+PImage read_png_file1(char name[]){
+    png_structp png_ptr;
+    png_infop info_ptr;
+    unsigned int sig_read = 0;
+    int color_type, interlace_type;
+    FILE *fp;
+
+    if ((fp = fopen(name, "rb")) == NULL) {
+        printf("#1");
+        return PImage();
+    }
+
+    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+
+    if (png_ptr == NULL) {
+        printf("#2");
+        fclose(fp);
+        return PImage();
+    }
+
+    info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr == NULL) {
+        printf("#3");
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, NULL, NULL);
+        return PImage();
+    }
+
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        printf("#4");
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        fclose(fp);
+        return PImage();
+    }
+
+    png_init_io(png_ptr, fp);
+
+    png_set_sig_bytes(png_ptr, sig_read);
+    png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
+
+    png_uint_32 width, height;
+    int bit_depth;
+    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, &interlace_type, NULL, NULL);
+    png_uint_32 outWidth = width;
+    png_uint_32 outHeight = height;
+
+    png_size_t row_bytes = png_get_rowbytes(png_ptr, info_ptr);
+
+    png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
+    for (int y=0; y<outHeight; y++) {
+        row_pointers[y] = (png_byte *) malloc(row_bytes);
+    }
+    png_read_image(png_ptr, row_pointers);
+    PImage img = PImage(outWidth, outHeight);
+    for (int y = 0; y < outHeight; y++) {
+        png_byte *row = row_pointers[y];
+        for (int x = 0; x < outWidth; x++) {
+            png_byte *ptr = &(row[x * 4]);
+            img.setPixel(x, y, ptr[0], ptr[1], ptr[2], ptr[3]);
+        }
+    }
+
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+
+    fclose(fp);
+    return img;
+}
+
+PImage read_png_file(char file_name[]) {
+    puts(file_name);
+    char header[8];    // 8 is the maximum size that can be checked
+
+    /* open file and test for it being a png */
+    FILE *fp = fopen(file_name, "rb");
+    if (!fp){
+        abort_("[read_png_file] File %s could not be opened for reading", file_name);
+
+    }
+    fread(header, 1, 8, fp);
+    if (png_sig_cmp(reinterpret_cast<png_const_bytep>(header), 0, 8)){
+        abort_("[read_png_file] File %s is not recognized as a PNG file", file_name);
+
+    }
+
+    png_structp png;
+    png_infop info;
+    /* initialize stuff */
+    png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+
+    if (!png){
+        abort_("[read_png_file] png_create_read_struct failed");
+
+    }
+
+    info = png_create_info_struct(png);
+    if (!info) {
+        abort_("[read_png_file] png_create_info_struct failed");
+
+    }
+
+    if (setjmp(png_jmpbuf(png))) {
+        abort_("[read_png_file] Error during init_io");
+
+    }
+
+    png_init_io(png, fp);
+    png_set_sig_bytes(png, 8);
+
+    png_read_info(png, info);
+
+    png_byte color_type;
+    png_byte bit_depth;
+    png_bytep *row_pointers;
+
+    png_uint_32 imgwidth = png_get_image_width(png, info);
+    png_uint_32 imgheight = png_get_image_height(png, info);
+    color_type = png_get_color_type(png, info);
+    bit_depth = png_get_bit_depth(png, info);
+
+    int number_of_passes = png_set_interlace_handling(png);
+    png_read_update_info(png, info);
+
+
+    /* read file */
+    if (setjmp(png_jmpbuf(png))){
+        abort_("[read_png_file] Error during read_image");
+    }
+
+    row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * imgheight);
+    for (int y=0; y<imgheight; y++)
+        row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png,info));
+
+    png_read_image(png, row_pointers);
+
+    PImage img = PImage(imgwidth, imgheight);
+//    std::cout<<"new PImage created!"<<std::endl;
+    //std::cout<<"row_pointers[0]: "<<std::endl;
+    row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * imgheight);
+    for (int y=0; y<imgheight; y++)
+        row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png,info));
+
+    png_read_image(png, row_pointers);
+
+    for (int y = 0; y < imgheight; y++) {
+        png_byte *row = row_pointers[y];
+        for (int x = 0; x < imgwidth; x++) {
+            png_byte *ptr = &(row[x * 4]);
+            //abort_("Pixel at position [ %d - %d ] has RGBA values: %d - %d - %d - %d\n",
+            img.setPixel(x, y, ptr[0], ptr[1], ptr[2], ptr[3]);
+        }
+    }
+    fclose(fp);
+
+    if (png_get_color_type(png, info) == PNG_COLOR_TYPE_RGB)
+        abort_("[process_file] input file is PNG_COLOR_TYPE_RGB but must be PNG_COLOR_TYPE_RGBA "
+                       "(lacks the alpha channel)");
+
+    if (png_get_color_type(png, info) != PNG_COLOR_TYPE_RGBA)
+        abort_("[process_file] color_type of input file must be PNG_COLOR_TYPE_RGBA (%d) (is %d)",
+               PNG_COLOR_TYPE_RGBA, png_get_color_type(png, info));
+
+    for (int y=0; y<imgheight; y++) {
+        png_byte* row = row_pointers[y];
+        for (int x=0; x<imgwidth; x++) {
+            png_byte* ptr = &(row[x*4]);
+            printf("Pixel at position [ %d - %d ] has RGBA values: %d - %d - %d - %d\n",
+                   x, y, ptr[0], ptr[1], ptr[2], ptr[3]);
+
+            /* set red value to 0 and green value to the blue one */
+            ptr[0] = 0;
+            ptr[1] = ptr[2];
+        }
+    }
+
+    return img;
+}
+
+PImage loadPNG(char *filename) {
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        std::cout << "File in path: " << std::string(filename) << " doesn't exist!" << std::endl;
+        return PImage(20, 20);
+    }
+    png_byte color_type;
+    png_byte bit_depth;
+    png_bytep *row_pointers;
+
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png) {
+        std::cout << "It's not a png file!" << std::endl;
+        abort();
+    }
+    png_infop info = png_create_info_struct(png);
+    if (!info) {
+        std::cout << "PNG info is invalid!" << std::endl;
+        abort();
+    }
+    if (setjmp(png_jmpbuf(png))) {
+        std::cout << "CRASH!" << std::endl;
+        abort();
+    }
+    png_init_io(png, fp);
+    //    std::cout<<"INIT IO!"<<std::endl;
+    png_read_info(png, info);
+    //    std::cout<<"Read info!"<<std::endl;
+
+    int imgwidth = png_get_image_width(png, info);
+    int imgheight = png_get_image_height(png, info);
+    color_type = png_get_color_type(png, info);
+    bit_depth = png_get_bit_depth(png, info);
+    //    std::cout<<"Set width and heights"<<std::endl;
+    // Read any color_type into 8bit depth, RGBA format.
+    // See http://www.libpng.org/pub/png/libpng-manual.txt
+
+    if (bit_depth == 16)
+        png_set_strip_16(png);
+
+    if (color_type == PNG_COLOR_TYPE_PALETTE)
+        png_set_palette_to_rgb(png);
+
+    // PNG_COLOR_TYPE_GRAY_ALPHA is always 8 or 16bit depth.
+    if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
+        png_set_expand_gray_1_2_4_to_8(png);
+
+    if (png_get_valid(png, info, PNG_INFO_tRNS))
+        png_set_tRNS_to_alpha(png);
+
+    // These color_type don't have an alpha channel then fill it with 0xff.
+    if (color_type == PNG_COLOR_TYPE_RGB ||
+        color_type == PNG_COLOR_TYPE_GRAY ||
+        color_type == PNG_COLOR_TYPE_PALETTE)
+        png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
+
+    if (color_type == PNG_COLOR_TYPE_GRAY ||
+        color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
+        png_set_gray_to_rgb(png);
+    //    std::cout<<"Updating info!"<<std::endl;
+    // set least one byte per channel
+    if (png_get_bit_depth(png, info) < 8) {
+        png_set_packing(png);
+    }
+    // if transparency, convert it to alpha
+    if (png_get_valid(png, info, PNG_INFO_tRNS)) {
+        png_set_tRNS_to_alpha(png);
+    }
+    png_set_interlace_handling(png);
+    png_read_update_info(png, info);
+    uint bpp = (uint) png_get_rowbytes(png, info) / imgwidth;
+
+    GLint format;
+    switch (png_get_color_type(png, info)) {
+        case PNG_COLOR_TYPE_GRAY:
+            format = GL_RGB;
+            std::cout << "Grayscale" << std::endl;
+            png_set_gray_to_rgb(png);
+            break;
+
+        case PNG_COLOR_TYPE_GRAY_ALPHA:
+            format = GL_RGBA;
+            std::cout << "Grayscale alpha" << std::endl;
+            png_set_gray_to_rgb(png);
+            break;
+
+        case PNG_COLOR_TYPE_PALETTE:
+            format = GL_RGB;
+            std::cout << "RGB palette" << std::endl;
+            png_set_expand(png);
+            break;
+
+        case PNG_COLOR_TYPE_RGB:
+            format = GL_RGB;
+            std::cout << "RGB color" << std::endl;
+            break;
+
+        case PNG_COLOR_TYPE_RGBA:
+            format = GL_RGBA;
+            std::cout << "Color RGBA" << std::endl;
+            break;
+
+        default:
+            format = -1;
+    }
+    if (format == -1) {
+        png_destroy_read_struct(&png, &info, nullptr);
+        fclose(fp);
+        return PImage(20, 20);
+    }
+
+
+    row_pointers = (png_bytep *) malloc(sizeof(png_bytep) * imgheight);
+    for (int y = 0; y < imgheight; y++) {
+        row_pointers[y] = (png_byte *) malloc(png_get_rowbytes(png, info));
+        //std::cout<<y<<": "<<(png_byte *) malloc(png_get_rowbytes(png, info))<<std::endl;
+    }
+    //    std::cout<<"pointers set!"<<std::endl;
+    //png_read_image(png, row_pointers);
+
+    //Read image
+
+
+    // allocate pixel buffer
+    unsigned char *pixels = new unsigned char[imgwidth * imgheight * bpp];
+
+    // setup array with row pointers into pixel buffer
+    png_bytep rows[imgheight];
+    unsigned char *p = pixels;
+    for (int i = 0; i < imgheight; i++) {
+        rows[i] = p;
+        p += imgwidth * bpp;
+    }
+
+    // read all rows (data goes into 'pixels' buffer)
+    // Note that any decoding errors will jump to the
+    // setjmp point and eventually return false
+    png_read_image(png, rows);
+    png_read_end(png, nullptr);
+    png_destroy_read_struct(&png, &info, nullptr);
+
+    PImage img = PImage(imgwidth, imgheight);
+    //    std::cout<<"new PImage created!"<<std::endl;
+    //std::cout<<"row_pointers[0]: "<<std::endl;
+    int test = 0;
+    img.format = format;
+    if (test == 0) {
+        row_pointers = (png_bytep *) malloc(sizeof(png_bytep) * height);
+        for (int y = 0; y < height; y++)
+            row_pointers[y] = (png_byte *) malloc(png_get_rowbytes(png, info));
+
+        png_read_image(png, row_pointers);
+
+        for (int y = 0; y < imgheight; y++) {
+            png_byte *row = row_pointers[y];
+            for (int x = 0; x < imgwidth; x++) {
+                png_byte *ptr = &(row[x * 4]);
+                //printf("Pixel at position [ %d - %d ] has RGBA values: %d - %d - %d - %d\n",
+                img.setPixel(x, y, ptr[0], ptr[1], ptr[2], ptr[3]);
+            }
+        }
+    } else {
+        int n = 4;
+        for (int y = 0; y < imgheight; y++) {
+            for (int x = 0; x < imgwidth; x++) {
+                int red = 255 - pixels[x * n + y * imgwidth];
+                int green = 255 - pixels[x * n + y * imgwidth + 1];
+                int blue = 255 - pixels[x * n + y * imgwidth + 2];
+                int alpha = 255 - pixels[x * n + y * imgwidth + 3];
+                //std::cout<<"Setting pixels to some value!"<<std::endl;
+                img.setPixel(x, y, red, green, blue, 255);
+                fill(red, green, blue);
+                rect(width / 2 + x, height / 2 + y, 1, 1);
+                std::cout << "pointer?: " << red << "," << green << "," << blue << "," << alpha << std::endl;
+            }
+        }
+        std::cout << "new PImage filled up!" << std::endl;
+        std::cout << "Image has been read!" << std::endl;
+    }
+    fclose(fp);
+    //    std::cout<<"Returning PImage of imgwidth and imgheight of "<<img.width<<"x"<<img.height<<std::endl;
+    return img;
+
 }
 
 // Math Functions
@@ -573,10 +1003,10 @@ std::string getPath() {
         return bytes;
     #endif
     // Linux
-    #if ENV_LINUX
+    #ifdef __unix__
     char result[ PATH_MAX ];
     ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
-    std::string final = std::string(result, (count > 0) ? count : 0);
+    final = std::string(result, (count > 0) ? count : 0);
     #endif
     return getFolder(final);
 }
@@ -625,10 +1055,50 @@ void setKeyReleased(void (*fun)(void)){
 void setMouseReleased(void (*fun)(void)) {
     kp = fun;
 }
+
+bool endsWith(const char string[], const char check[]){
+    if(strlen(string)>=strlen(check)){
+        int offset = int(strlen(string)-strlen(check));
+        for(int i = offset; i < strlen(string); i++){
+            if(string[i] != check[i-offset]){
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+bool startsWith(const char string[], const char check[]){
+    if(strlen(string)>=strlen(check)){
+        int offset = strlen(check);
+        for(int i = 0; i < offset; i++){
+            if(string[i] != check[i]){
+                return false;
+            }
+        }
+        return true;
+    }
+}
 // Classes
-
-
 // Placeholders
 
+//#ifndef SETUPFUN
+//    void setup(){}
+//#endif
+//#ifndef DRAWFUN
+//    void draw(){}
+//#endif
+//#ifndef DRAWFUN
+//    void keyPressed(){}
+//#endif
+//#ifndef krfun
+//    void keyReleased(){}
+//#endif
+//#ifndef mpfun
+//    void mousePressed(){}
+//#endif
+//#ifndef mrfun
+//    void mouseReleased(){}
+//#endif
 #endif //P5C_H
 #pragma clang diagnostic pop
