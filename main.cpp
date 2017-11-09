@@ -4,48 +4,30 @@
 
 #include "P5c.h"
 
-class Flyer{
-public:
-    PVector pos;
-    PVector acc;
-    Color stroke;
-    Flyer(){
-        pos.set(width/2, height/2);
-        acc.random2D();
-        acc.mult(random(-5, 5));
-    }
-    void update(){
-        if(pos.x > width || pos.x < 0 || pos.y > height || pos.y < 0){
-            reset(width/2, height/2);
-        }
-        pos.add(acc);
-    }
-    void show(){
-        point(pos.x, pos.y);
-        //ellipse(pos.x, pos.y, 15, 15);
-    }
-    void reset(float x, float y){
-        pos.set(x, y);
-        acc.random2D();
-        stroke = Color(random(255), random(255), random(255), 255);
-    }
-};
-
-int n = 50;
-Flyer f[50]; // NOLINT
+PVector pos;
+PVector vel;
+PVector paddle;
+PVector paddledim = PVector(100, 5);
 
 void setup(){
+    stroke(0);
+    fill(255);
     size(800, 600);
+    paddle = PVector(width/2, height-20);
+    pos.set(width/2, height/2);
+    vel.random2D();
     background(51);
-    for(int i = 0; i < n; i++){
-        f[i].reset(width/2, height/2);
-    }
 }
 
 void draw(){
-    for(int i = 0; i < n; i++){
-        f[i].update();
-        stroke(static_cast<int>(f[i].stroke.r), static_cast<int>(f[i].stroke.g), static_cast<int>(f[i].stroke.b), static_cast<int>(f[i].stroke.a));
-        f[i].show();
+    background(51);
+    ellipse(pos.x, pos.y, 5, 5);
+    pos.add(vel);
+    if(pos.x > width || pos.x < 0){
+        vel.x = -vel.x;
     }
+    if(pos.y > height || pos.y < 0){
+        vel.y = -vel.y;
+    }
+    rect(paddle.x-paddledim.x/2, paddle.y-paddledim.y/2, paddledim.x, paddledim.y);
 }

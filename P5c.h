@@ -20,6 +20,8 @@ const int CLOSE = 1;
 #include <wait.h>
 #include <chrono>
 #include <GL/freeglut.h>
+#include <SOIL/SOIL.h>
+//#include <freeImage
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -599,11 +601,27 @@ void image1(PImage img, int x, int y) {
 
 
 PImage loadImage(char url[]) {
-    GLuint texture;
-    texture = LoadTexture(url);
-    glReadPixels();
+    //texture = LoadTexture(url);
+    GLint w;
+    GLint h;
     PImage img = PImage();
-    //img = LoadTexture(url);
+    // TODO: Use SOIL LIB for image loading
+//    GLuint tex_2d = SOIL_load_OGL_texture(url, SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT);
+//    //glGetTexImage(GL_TEXTURE_2D,0,GL_RGB,GL_UNSIGNED_BYTE,tex_2d);
+//    glBindTexture(GL_TEXTURE_2D, tex_2d);
+//    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+//    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+//    img = PImage(w, h);
+//    GLuint tex[w][h][3];
+//    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, &tex);
+//    glBindTexture(GL_TEXTURE_2D, 0);
+//    for(int i = 0; i < h; i++){
+//        for(int j = 0; j < w; j++){
+//            img.setPixel(i, j, tex[i][j][0], tex[i][j][1], tex[i][j][2]);
+//        }
+//    }
+//    return img;
+//    img = LoadTexture(url);
 //    if(endsWith(url, ".png")){
 //        // PNG code
 //        img = loadPNG(url);
@@ -611,55 +629,8 @@ PImage loadImage(char url[]) {
 //    }else if(endsWith(url, ".jpg")){
 //        // JPG code
 //    }
-    return img;
+//    return img;
 }
-
-//GLuint LoadTexture(const char *filename) {
-//
-//    GLuint texture;
-//    texture.loadImage("");
-//
-//    int width, height;
-//
-//    unsigned char *data;
-//
-//    FILE *file;
-//
-//    file = fopen(filename, "rb");
-//
-//    if (file == NULL) return 0;
-//    width = 1024;
-//    height = 512;
-//    data = (unsigned char *) malloc(width * height * 3);
-//    //int size = fseek(file,);
-//    fread(data, width * height * 3, 1, file);
-//    fclose(file);
-//
-//    for (int i = 0; i < width * height; ++i) {
-//        int index = i * 3;
-//        unsigned char B, R;
-//        B = data[index];
-//        R = data[index + 2];
-//
-//        data[index] = R;
-//        data[index + 2] = B;
-//    }
-//
-//
-//    glGenTextures(1, &texture);
-//    glBindTexture(GL_TEXTURE_2D, texture);
-//    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-//
-//
-//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-//    gluBuild2DMipmaps(GL_TEXTURE_2D, 3, width, height, GL_RGB, GL_UNSIGNED_BYTE, data);
-//    free(data);
-//
-//    return texture;
-//}
 
 // Math Functions
 
@@ -799,25 +770,8 @@ bool startsWith(const char string[], const char check[]) {
     }
 }
 // Classes
+
 // Placeholders
 
-//#ifndef SETUPFUN
-//    void setup(){}
-//#endif
-//#ifndef DRAWFUN
-//    void draw(){}
-//#endif
-//#ifndef DRAWFUN
-//    void keyPressed(){}
-//#endif
-//#ifndef krfun
-//    void keyReleased(){}
-//#endif
-//#ifndef mpfun
-//    void mousePressed(){}
-//#endif
-//#ifndef mrfun
-//    void mouseReleased(){}
-//#endif
 #endif //P5C_H
 #pragma clang diagnostic pop
