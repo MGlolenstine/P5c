@@ -67,17 +67,17 @@ void pushMatrix();
 void translate(int x, int y, int z);
 
 // Event functions
-void (*st)() = NULL;
+void (*st)() = nullptr;
 
-void (*dr)() = NULL;
+void (*dr)() = nullptr;
 
-void (*kp)() = NULL;
+void (*kp)() = nullptr;
 
-void (*kr)() = NULL;
+void (*kr)() = nullptr;
 
-void (*mc)() = NULL;
+void (*mc)() = nullptr;
 
-void (*mr)() = NULL;
+void (*mr)() = nullptr;
 
 void handleKeypress(unsigned char input, int x, int y);
 
@@ -211,12 +211,12 @@ class PImage {
 public:
     std::vector<Color> pixels;
     GLuint imgName;
-    GLuint id;
     int width;
     int height;
     GLint format = GL_RGBA;
 
     PImage() {
+        imgName = 0;
         width = 64;
         height = 64;
         Color tmppixels[width * height];
@@ -227,6 +227,7 @@ public:
     }
 
     PImage(int width_, int height_) {
+        imgName = 0;
         width = width_;
         height = height_;
         Color tmppixels[width * height];
@@ -237,6 +238,7 @@ public:
     }
 
     PImage(int width_, int height_, int r_, int g_, int b_) {
+        imgName = 0;
         width = width_;
         height = height_;
         Color tmppixels[width * height];
@@ -247,6 +249,7 @@ public:
     }
 
     PImage(int width_, int height_, int r_, int g_, int b_, int a_) {
+        imgName = 0;
         width = width_;
         height = height_;
         Color tmppixels[width * height];
@@ -261,17 +264,17 @@ public:
             g = r;
             b = r;
         }
-        pixels.at(x + y * width) = Color(r, g, b, a);
-//        Color cols[width*height];
-//        int index = 0;
-//        for(Color c : pixels){
-//            cols[index] = c;
-//        }
-//        cols[x+y*width] = Color(r, g, b, a);
-//        pixels.clear();
-//        for(Color c : cols){
-//            pixels.push_back(c);
-//        }
+        pixels.at(static_cast<unsigned long>(x + y * width)) = Color(r, g, b, a); // NOLINT
+    }
+
+    void flip(){
+        ilBindImage(imgName);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glBindTexture(GL_TEXTURE_2D, imgName);
+        ilConvertImage(IL_RGBA, IL_UNSIGNED_BYTE);
+        iluFlipImage();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, IL_RGBA, GL_UNSIGNED_BYTE, ilGetData());
     }
 };
 
@@ -352,10 +355,10 @@ void handleMousePress(int button, int state, int x, int y) {
     mouseY = y;
     mouseButton = button;
     if (state == GLUT_DOWN) {
-        if (mc != NULL)
+        if (mc != nullptr)
             (*mc)();
     } else {
-        if (mr != NULL)
+        if (mr != nullptr)
             (*mr)();
     }
 }
@@ -367,13 +370,13 @@ void handleMousePos(int x, int y) {
 
 void handleKeypress(unsigned char input, int x, int y) {
     key = input;
-    if (kp != NULL)
+    if (kp != nullptr)
         (*kp)();
 }
 
 void handleKeyrelease(unsigned char input, int x, int y) {
     key = input;
-    if (kr != NULL)
+    if (kr != nullptr)
         (*kr)();
 }
 
@@ -553,7 +556,14 @@ void fill(int r, int g = 256, int b = 256, int a = 255) {
     fillCol = Color(r, g, b, a);
 }
 
-void image(PImage img, int x, int y, int w, int h) {
+void image(PImage img, int x, int y, int w = -1, int h = -1) {
+    if(w == -1 && h == -1){
+        w = img.width;
+        h = img.height;
+    }else if(w != -1 && h == -1){
+        float ratio = (float)w/img.width;
+        h = int(img.height*ratio);
+    }
     GLuint textureName = img.imgName;
     glColor4d(255, 255, 255, 255);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -682,7 +692,7 @@ std::string getPath() {
 #ifdef __unix__
     char result[PATH_MAX];
     ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-    final = std::string(result, (count > 0) ? count : 0);
+    final = std::string(result, static_cast<unsigned long>((count > 0) ? count : 0));
 #endif
     return getFolder(final);
 }
@@ -716,25 +726,25 @@ std::string dataDirectory(const char input[] = "") {
 
 // Re-declaration of event functions
 
-void setMouseClicked(void (*fun)(void)) {
+void setMouseClicked(void (*fun)()) {
     mc = fun;
 }
 
-void setKeyPressed(void (*fun)(void)) {
+void setKeyPressed(void (*fun)()) {
     kp = fun;
 }
 
-void setKeyReleased(void (*fun)(void)) {
+void setKeyReleased(void (*fun)()) {
     kp = fun;
 }
 
-void setMouseReleased(void (*fun)(void)) {
+void setMouseReleased(void (*fun)()) {
     kp = fun;
 }
 
 bool endsWith(const char string[], const char check[]) {
     if (strlen(string) >= strlen(check)) {
-        int offset = int(strlen(string) - strlen(check));
+        auto offset = int(strlen(string) - strlen(check));
         for (int i = offset; i < strlen(string); i++) {
             if (string[i] != check[i - offset]) {
                 return false;
@@ -746,7 +756,7 @@ bool endsWith(const char string[], const char check[]) {
 
 bool startsWith(const char string[], const char check[]) {
     if (strlen(string) >= strlen(check)) {
-        int offset = strlen(check);
+        auto offset = static_cast<int>(strlen(check));
         for (int i = 0; i < offset; i++) {
             if (string[i] != check[i]) {
                 return false;

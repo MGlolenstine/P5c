@@ -1,12 +1,13 @@
 #include "P5c.h"
 
-PImage img;
+PImage img; //NOLINT
 
 void setup(){
     size(800, 600);
-    img = loadImage("cat.png");
+    img = loadImage(const_cast<char *>("burning_cat.jpg"));
+    img.flip();
 }
 
 void draw(){
-    image(img, 0, 0, 800, 600);
+    image(img, 0, 0);
 }
