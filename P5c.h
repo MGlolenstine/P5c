@@ -20,8 +20,6 @@ const int CLOSE = 1;
 #include <wait.h>
 #include <chrono>
 #include <GL/freeglut.h>
-#include <SOIL/SOIL.h>
-//#include <freeImage
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -34,6 +32,8 @@ const int CLOSE = 1;
 #include <unistd.h>
 #include <sys/param.h>
 #include <libgen.h>
+#include <IL/il.h>
+#include <ilut.h>
 
 // Functions
 void draw();
@@ -209,7 +209,9 @@ public:
 
 class PImage {
 public:
-    std::vector <Color> pixels;
+    std::vector<Color> pixels;
+    GLuint imgName;
+    GLuint id;
     int width;
     int height;
     GLint format = GL_RGBA;
@@ -218,7 +220,7 @@ public:
         width = 64;
         height = 64;
         Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(255, 255, 255, 255));
+        std::fill_n(tmppixels, width * height, Color(0, 0, 0, 0));
         for (Color c : tmppixels) {
             pixels.push_back(c);
         }
@@ -228,7 +230,7 @@ public:
         width = width_;
         height = height_;
         Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(255, 255, 255, 255));
+        std::fill_n(tmppixels, width * height, Color(0, 0, 0, 0));
         for (Color c : tmppixels) {
             pixels.push_back(c);
         }
@@ -310,6 +312,8 @@ int main() {
     fillCol = Color(0, 0, 0, 255);
     lastver = PVector(0, 0, 0);
     (*st)();
+    ilutRenderer(ILUT_OPENGL);
+    ilutInit();
     glutMainLoop();
     timeToWait = int(float(1000) / framerate);
     curTime = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -326,7 +330,7 @@ void size(int w_, int h_) {
     int myargc = 1;
     myargv[0] = strdup("Untitled");
     glutInit(&myargc, myargv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_STENCIL);
+    glutInitDisplayMode(GLUT_RGBA);
     glutInitWindowSize(width, height);
     if (title == nullptr) {
         window = glutCreateWindow(myargv[0]);
@@ -550,22 +554,38 @@ void fill(int r, int g = 256, int b = 256, int a = 255) {
 void image(PImage img, int x, int y) {
     y = height - y;
     pushMatrix();
-    int texDat[img.height * img.width];
-    for (int i = 0; i < img.height * img.width; i++) {
-        Color col = img.pixels.at(static_cast<unsigned long>(i));
-        int r = col.r;
-        int g = col.g;
-        int b = col.b;
-        texDat[i] = (r << 16) | (g << 8) | b;
-    }
+    //int texDat[img.height * img.width];
+    unsigned int texDat[img.height][img.width][3];
+    for (int i = 0; i < img.height; i++) {
+        for (int j = 0; j < img.width; j++) {
+            Color col = img.pixels.at(static_cast<unsigned long>(i));
+            int r = col.r;
+            int g = col.g;
+            int b = col.b;
+            //int a = col.a;
+            //texDat[i] = (r << 32) | (g << 16) | (b << 8) | a;
+            texDat[i][j][0] = r;
+            texDat[i][j][1] = g;
+            texDat[i][j][2] = b;
+            if(r != 0 || g != 0 || b != 0) {
+                printf("x: %i, y: %i, r: %i, g: %i, b: %i\n", j, i, r, g, b);
+            }
+            //texDat[i][j][3] = a;
 
+
+        }
+        //std::cout<<"info: "<<(int)texDat[i]<<std::endl;
+    }
+    glDrawPixels(img.width, img.height, GL_RGB, GL_UNSIGNED_INT, texDat);
+
+    return;
     //upload texture to GPU
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, img.format, img.width, img.height, 0, img.format, GL_UNSIGNED_BYTE, texDat);
+    glTexImage2D(GL_TEXTURE_2D, 0, img.format, img.width, img.height, 0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, texDat);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -586,50 +606,210 @@ void image(PImage img, int x, int y) {
 }
 
 void image1(PImage img, int x, int y) {
-    y = height - y;
-    pushMatrix();
-    for (int i = 0; i < img.height; i++) {
-        for (int j = 0; j < img.width; j++) {
-            Color col = img.pixels.at(j + i * img.width);
-            std::cout << "drawing pixel: " << col.r << ", " << col.g << ", " << col.b << ", " << col.a << std::endl;
-            fill(col.r, col.g, col.b, 255);
-            rect(j, i, 1, 1);
+    y = height-y;
+    ilBindImage(img.imgName);
+    glDrawPixels(x, y, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT, ilGetData());
+    ILubyte *data = ilGetData();
+    int nop = ilGetInteger(IL_IMAGE_BITS_PER_PIXEL);
+    /*while(data != nullptr){
+        if(nop == 8) {
+            int tmp = *data;
+            std::cout << "Data: " << tmp. << std::endl;
+        }else if(nop == 3){
+            std::cout << "Data: " << (int) *data << ", " << (int) *(data + 1) << ", " << (int) *(data + 2) << std::endl;
+        }else{
+            std::cout<<"NOP: "<< nop<<std::endl;
         }
-    }
-    popMatrix();
+        data+=1;
+    }*/
 }
 
+PImage makeImage(){
+    PImage img;
+    GLuint textureName;
+    GLbyte textureData[] = {};
+    GLsizei w = 2;
+    GLsizei h = 2;
+
+    GLuint tmpImg;
+
+    //ilLoadImage(char url[]);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glGenTextures(1, &textureName);   // generate a texture handler really reccomanded (mandatory in openGL 3.0)
+    glBindTexture(GL_TEXTURE_2D, textureName); // tell openGL that we are using the texture
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)textureData); // send the texture data
+    img.imgName = textureName;
+    img.width = w;
+    img.height = h;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    return img;
+}
+
+void showImage(PImage img, int x, int y, int w, int h) {
+//    GLuint textureName;
+//    GLbyte textureData[] = { 0, 0, 0, (GLbyte)255, 0, 0, 0, (GLbyte)255, 0, 0, 0, (GLbyte)255, (GLbyte)255, (GLbyte)255, 0 };
+//    GLsizei w = 2;
+//    GLsizei h = 2;
+//
+//    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+//    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+//    glGenTextures(1, &textureName);   // generate a texture handler really reccomanded (mandatory in openGL 3.0)
+//    glBindTexture(GL_TEXTURE_2D, textureName); // tell openGL that we are using the texture
+//
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)textureData); // send the texture data
+//    img.imgName = textureName;
+//    img.width = w;
+//    img.height = h;
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+
+    glEnable(GL_TEXTURE_2D); // you should use shader, but for an example fixed pipeline is ok ;)
+    glBindTexture(GL_TEXTURE_2D, img.imgName);
+    glBegin(GL_QUADS);  // draw something with the texture on
+    glTexCoord2f(0.0, 0.0);
+    glVertex2f(x, y);
+
+    glTexCoord2f(1.0, 0.0);
+    glVertex2f(x + w, y);
+
+    glTexCoord2f(1.0, 1.0);
+    glVertex2f(x + w, y + h);
+
+    glTexCoord2f(0.0, 1.0);
+    glVertex2f(x, y + h);
+
+    glEnd();
+}
 
 PImage loadImage(char url[]) {
     //texture = LoadTexture(url);
-    GLint w;
-    GLint h;
-    PImage img = PImage();
-    // TODO: Use SOIL LIB for image loading
-//    GLuint tex_2d = SOIL_load_OGL_texture(url, SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT);
-//    //glGetTexImage(GL_TEXTURE_2D,0,GL_RGB,GL_UNSIGNED_BYTE,tex_2d);
-//    glBindTexture(GL_TEXTURE_2D, tex_2d);
-//    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
-//    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+    boolean loaded = ilLoadImage(url);
+    if(loaded){
+        puts("Loaded!");
+    }else{
+        puts("Not loaded!");
+        puts("Error: ");
+        std::cout<<ilGetError()<<std::endl;
+        return PImage();
+    }
+    ILint w = ilGetInteger(IL_IMAGE_WIDTH);
+    ILint h = ilGetInteger(IL_IMAGE_HEIGHT);
+    std::cout << "Current width and height: " << w << "x" << h << std::endl;
+    PImage img = PImage(w, h);
+    ilGenImages(1, &img.imgName);
+    /*if (ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 3) {
+        std::cout<<"3"<<std::endl;
+        ILubyte *data = ilGetData();
+        int curW = 0;
+        int curH = 0;
+        for (int i = 0; i < 3 * w * h; i += 3) {
+            if (curW >= w) {
+                curW = 0;
+                curH++;
+            }
+            img.setPixel(curW, curH, *(data + i), *(data + i + 1), *(data + i + 2));
+        }
+    } else if (ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 4) {
+        std::cout<<"4"<<std::endl;
+        ILubyte *data = ilGetData();
+        int curW = 0;
+        int curH = 0;
+        for (int i = 0; i < 4 * w * h; i += 4) {
+            if (curW >= w) {
+                curW = 0;
+                curH++;
+            }
+            img.setPixel(curW, curH, *(data + i), *(data + i + 1), *(data + i + 2), *(data + i + 3));
+        }
+    }*/
+    GLuint textureName;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glGenTextures(1, &textureName);   // generate a texture handler really reccomanded (mandatory in openGL 3.0)
+    glBindTexture(GL_TEXTURE_2D, textureName); // tell openGL that we are using the texture
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, ilGetData()); // send the texture data
+    img.imgName = textureName;
+    img.width = w;
+    img.height = h;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    return img;
+//    GLint w;
+//    GLint h;
+//    PImage img;
+//
+//    GLuint texture;
+//
+//    unsigned char *data;
+//
+//    char header[54];
+//
+//    FILE *file;
+//
+//    file = fopen(url, "rb");
+//
+//    fread(header, sizeof(unsigned char), 54, file);
+//
+//    int size = 4 * w * h;
+//
+//    if (file == NULL) return img;
+//    w = *(int *)&header[18];
+//    h = *(int *)&header[22];
 //    img = PImage(w, h);
-//    GLuint tex[w][h][3];
-//    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, &tex);
-//    glBindTexture(GL_TEXTURE_2D, 0);
-//    for(int i = 0; i < h; i++){
-//        for(int j = 0; j < w; j++){
-//            img.setPixel(i, j, tex[i][j][0], tex[i][j][1], tex[i][j][2]);
+//    auto* data1 = new unsigned char[size]; // allocate 4 bytes per pixel
+//    fread(data1, sizeof(unsigned char), size, file); // read the rest of the data at once
+//    fclose(file);
+//
+//    int curW = 0;
+//    int curH = 0;
+//    for(int i = 0; i < size; i += 4){
+//        if(curW >= w){
+//            curW = 0;
+//            curH++;
 //        }
+//
+//        img.setPixel(curW, curH, (int)data1[i+1], (int)data1[i+2], (int)data1[i+3], (int)data1[i]);
+//        //std::cout<<curW<<", "<<curH<<", "<<(int)data1[i+1]<<", "<<(int)data1[i+2]<<", "<<(int)data1[i+3]<<", "<<(int)data1[i]<<std::endl;
+//
+//        curW++;
 //    }
+//
+//    glGenTextures(1, &texture);
+//    glBindTexture(GL_TEXTURE_2D, texture);
+//    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+//
+//
+//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+//    //gluBuild2DMipmaps(GL_TEXTURE_2D, 3, w, h, GL_RGBA, GL_UNSIGNED_BYTE, data);
+//    free(data1);
+//    img.id = texture;
+//
 //    return img;
-//    img = LoadTexture(url);
-//    if(endsWith(url, ".png")){
-//        // PNG code
-//        img = loadPNG(url);
-//        //img = read_png_file1(url);
-//    }else if(endsWith(url, ".jpg")){
-//        // JPG code
-//    }
-//    return img;
+    //texture is id of the texture
+}
+
+void text(char c[], int x, int y){
+    y = height-y;
+    pushMatrix();
+    //translate(x, y, 0);
+    glColor3d(fillCol.r, fillCol.g, fillCol.b);
+    glRasterPos2d(x, y);
+    //glColor3d(fillCol.r, fillCol.g, fillCol.b);
+    //glColor3f(1, 1, 1);
+    //glDisable(GL_LIGHTING);
+    for(int i = 0; i < strlen(c); i++){
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c[i]);
+        //glRasterPos2d(x+i, y);
+    }
+    popMatrix();
+
 }
 
 // Math Functions
@@ -694,8 +874,8 @@ std::string getPath() {
 #endif
     // Linux
 #ifdef __unix__
-    char result[ PATH_MAX ];
-    ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+    char result[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
     final = std::string(result, (count > 0) ? count : 0);
 #endif
     return getFolder(final);

@@ -1,26 +1,25 @@
-//
-// Created by notyours on 10/26/17.
-//
-
 #include "P5c.h"
 
+PImage img;
 PVector pos;
 PVector vel;
-PVector paddle;
-PVector paddledim = PVector(100, 5);
 
 void setup(){
-    stroke(0);
-    fill(255);
     size(800, 600);
-    paddle = PVector(width/2, height-20);
-    pos.set(width/2, height/2);
+    pos = PVector(width/2, height/2);
+    //img = loadImage((char*)"/home/notyours/CLionProjects/untitled/sun.png");
+    //img = makeImage();
     vel.random2D();
+    vel.mult(5);
     background(51);
 }
 
 void draw(){
     background(51);
+    fill(255, 0, 0);
+    text("Hello world!", width/2, 20);
+    stroke(0);
+    fill(255);
     ellipse(pos.x, pos.y, 5, 5);
     pos.add(vel);
     if(pos.x > width || pos.x < 0){
@@ -29,5 +28,5 @@ void draw(){
     if(pos.y > height || pos.y < 0){
         vel.y = -vel.y;
     }
-    rect(paddle.x-paddledim.x/2, paddle.y-paddledim.y/2, paddledim.x, paddledim.y);
+    //showImage(img, width/2, height/2, 100, 100);
 }
