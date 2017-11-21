@@ -34,8 +34,13 @@ const int CLOSE = 1;
 #include <libgen.h>
 #include <IL/il.h>
 #include <ilut.h>
+#include <sstream>
+#include <stdlib.h>
 
 // Functions
+
+void KeyPressed();
+
 void draw();
 
 void display();
@@ -267,7 +272,7 @@ public:
         pixels.at(static_cast<unsigned long>(x + y * width)) = Color(r, g, b, a); // NOLINT
     }
 
-    void flip(){
+    void flip() {
         ilBindImage(imgName);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -290,14 +295,14 @@ int mouseButton;
 int strokeweight = 1;
 Color strokeCol; // NOLINT
 Color fillCol; // NOLINT
-int counter = 0;
+int counterV = 0;
 PVector lastver; // NOLINT
 bool translated = false;
 std::string path = ""; // NOLINT
 
 int framerate = 60;
 int timeToWait;
-long curTime;
+long currentTime;
 char *title = nullptr;
 Color last; // NOLINT
 
@@ -321,9 +326,9 @@ int main() {
     (*st)();
     glutMainLoop();
     timeToWait = int(float(1000) / framerate);
-    curTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+    currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-    srand(static_cast<unsigned int>(curTime));
+    srand(static_cast<unsigned int>(currentTime));
 }
 
 // Window related functions
@@ -335,7 +340,7 @@ void size(int w_, int h_) {
     int myargc = 1;
     myargv[0] = strdup("Untitled");
     glutInit(&myargc, myargv);
-    glutInitDisplayMode(GLUT_RGBA);
+    glutInitDisplayMode(GLUT_RGB);
     glutInitWindowSize(width, height);
     if (title == nullptr) {
         window = glutCreateWindow(myargv[0]);
@@ -348,6 +353,7 @@ void size(int w_, int h_) {
     glutMotionFunc(handleMousePos);
     glutPassiveMotionFunc(handleMousePos);
     glutMouseFunc(handleMousePress);
+    glutDisplayFunc(display);
 }
 
 void handleMousePress(int button, int state, int x, int y) {
@@ -370,8 +376,9 @@ void handleMousePos(int x, int y) {
 
 void handleKeypress(unsigned char input, int x, int y) {
     key = input;
-    if (kp != nullptr)
+    if (kp != nullptr) {
         (*kp)();
+    }
 }
 
 void handleKeyrelease(unsigned char input, int x, int y) {
@@ -413,13 +420,14 @@ void display() {
     }
     while (true) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count() >= curTime + timeToWait) {
-            curTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count() >= currentTime + timeToWait) {
+            currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now().time_since_epoch()).count();
             glMatrixMode(GL_MODELVIEW);
             (*dr)();
             glFlush();
             glutPostRedisplay();
+            break;
         }
     }
 }
@@ -441,7 +449,7 @@ void background(int r, int g = 256, int b = 256, int a = 255) {
 
 void beginShape(GLenum shape) {
     glBegin(shape);
-    counter = 0;
+    counterV = 0;
 }
 
 void endShape(GLenum close) {
@@ -449,13 +457,13 @@ void endShape(GLenum close) {
         glVertex3d(lastver.x, lastver.y, lastver.z);
     }
     glEnd();
-    counter = 0;
+    counterV = 0;
 }
 
 void vertex(float x, float y, float z = 0) {
-    counter++;
+    counterV++;
     y = map(y, 0, height, height, 0);
-    if (counter == 1) {
+    if (counterV == 1) {
         lastver = PVector(x, y, z);
     }
     glVertex3d(x, y, z);
@@ -557,18 +565,18 @@ void fill(int r, int g = 256, int b = 256, int a = 255) {
 }
 
 void image(PImage img, int x, int y, int w = -1, int h = -1) {
-    if(w == -1 && h == -1){
+    if (w == -1 && h == -1) {
         w = img.width;
         h = img.height;
-    }else if(w != -1 && h == -1){
-        float ratio = (float)w/img.width;
-        h = int(img.height*ratio);
+    } else if (w != -1 && h == -1) {
+        float ratio = (float) w / img.width;
+        h = int(img.height * ratio);
     }
     GLuint textureName = img.imgName;
     glColor4d(255, 255, 255, 255);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, textureName);
     glBegin(GL_QUADS);
@@ -590,12 +598,12 @@ void image(PImage img, int x, int y, int w = -1, int h = -1) {
 }
 
 PImage loadImage(char url[]) {
-    std::string s = getPath()+"/"+url;
+    std::string s = getPath() + "/" + url;
     boolean loaded = ilLoadImage(s.c_str());
 
-    if(!loaded){
+    if (!loaded) {
         puts("Not loaded!");
-        std::cout<<"Error: "<<iluErrorString(ilGetError())<<std::endl;
+        std::cout << "Error: " << iluErrorString(ilGetError()) << std::endl;
         return PImage();
     }
     GLuint textureName;
@@ -616,18 +624,21 @@ PImage loadImage(char url[]) {
     return img;
 }
 
-void text(char c[], int x, int y){
-    y = height-y;
+void text(char c[], int x, int y) {
+    y = height - y;
     pushMatrix();
     glColor3d(fillCol.r, fillCol.g, fillCol.b);
     glRasterPos2d(x, y);
-    for(int i = 0; i < strlen(c); i++){
+    for (int i = 0; i < strlen(c); i++) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c[i]);
     }
     popMatrix();
 
 }
 
+long millis(){
+    return glutGet(GLUT_ELAPSED_TIME);
+}
 // Math Functions
 
 float map(float n, float min1, float max1, float min2, float max2) {
