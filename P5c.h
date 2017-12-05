@@ -16,6 +16,7 @@
 #define P5C_H
 
 const int CLOSE = 1;
+const int P3D = 1;
 
 #include <wait.h>
 #include <chrono>
@@ -33,7 +34,7 @@ const int CLOSE = 1;
 #include <sys/param.h>
 #include <libgen.h>
 #include <IL/il.h>
-#include <ilut.h>
+#include <IL/ilut.h>
 #include <sstream>
 #include <algorithm>
 #include <random>
@@ -48,7 +49,7 @@ void display();
 
 void setup();
 
-void size(int w_, int h_);
+void size(int w_, int h_, int mode);
 
 float map(float n, float min1, float max1, float min2, float max2);
 
@@ -211,6 +212,16 @@ public:
         y = y / a;
         z = z / a;
     }
+
+    void limit(float max){
+        if(magSq() > max*max) {
+            normalize();
+            mult(max);
+        }
+    }
+    float magSq(){
+        return (x*x+y*y+z*z);
+    }
 };
 
 class PImage {
@@ -282,6 +293,12 @@ public:
         iluFlipImage();
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, IL_RGBA, GL_UNSIGNED_BYTE, ilGetData());
     }
+
+    void empty(){
+        pixels.clear();
+        width = 0;
+        height = 0;
+    }
 };
 
 // Variables
@@ -294,7 +311,7 @@ int mouseX;
 int mouseY;
 int mouseButton;
 int strokeweight = 1;
-int octave = 2;
+int octave = 4;
 Color strokeCol; // NOLINT
 Color fillCol; // NOLINT
 int counterV = 0;
@@ -305,7 +322,7 @@ std::string path = ""; // NOLINT
 int framerate = 60;
 int timeToWait;
 long currentTime;
-char *title = nullptr;
+const char *title = nullptr;
 Color last; // NOLINT
 
 PImage loadPNG(char url[]);
@@ -337,7 +354,7 @@ int main() {
 
 // Window related functions
 
-void size(int w_, int h_) {
+void size(int w_, int h_, int mode = -1) {
     height = h_;
     width = w_;
     char *myargv[1];
@@ -350,6 +367,9 @@ void size(int w_, int h_) {
         window = glutCreateWindow(myargv[0]);
     } else {
         window = glutCreateWindow(strdup(title));
+    }
+    if(mode == 1){
+        glMatrixMode(GL_MODELVIEW);
     }
     glutReshapeFunc(handleResize);
     glutKeyboardFunc(handleKeypress);
@@ -405,7 +425,7 @@ void handleResize(int w, int h) {
     display();
 }
 
-void name(char *s) {
+void name(const char *s) {
     title = s;
 }
 
@@ -452,6 +472,7 @@ void background(int r, int g = 256, int b = 256, int a = 255) {
 }
 
 void beginShape(GLenum shape) {
+    glEnable(GL_BLEND);
     glBegin(shape);
     counterV = 0;
 }
@@ -460,6 +481,7 @@ void endShape(GLenum close) {
     if (close == 1) {
         glVertex3d(lastver.x, lastver.y, lastver.z);
     }
+    glDisable(GL_BLEND);
     glEnd();
     counterV = 0;
 }
@@ -470,6 +492,7 @@ void vertex(float x, float y, float z = 0) {
     if (counterV == 1) {
         lastver = PVector(x, y, z);
     }
+    glColor3f((float)fillCol.r/255, (float)fillCol.g/255, (float)fillCol.b/255);
     glVertex3d(x, y, z);
 }
 
@@ -583,6 +606,10 @@ void fill(int r, int g = 256, int b = 256, int a = 255) {
     fillCol = Color(r, g, b, a);
 }
 
+void fill(Color color){
+    fillCol = color;
+}
+
 void image(PImage img, int x, int y, int w = -1, int h = -1) {
     y = height - y;
     if (w == -1 && h == -1) {
@@ -617,7 +644,7 @@ void image(PImage img, int x, int y, int w = -1, int h = -1) {
     glDisable(GL_TEXTURE_2D);
 }
 
-PImage loadImage(char url[]) {
+PImage loadImage(const char url[]) {
     std::string s = getPath() + "/" + url;
     boolean loaded = ilLoadImage(s.c_str());
 
@@ -638,9 +665,6 @@ PImage loadImage(char url[]) {
     iluFlipImage();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, IL_RGBA, GL_UNSIGNED_BYTE, ilGetData()); // send the texture data
     img.imgName = textureName;
-    img.width = w;
-    img.height = h;
-
     return img;
 }
 
@@ -667,6 +691,20 @@ void noFill() {
 void noStroke() {
     strokeCol.a = 0;
 }
+
+PImage loadPixels(){
+    PImage img = PImage(width, height);
+    auto *pixmap=(GLubyte *)malloc(width*height*4);
+    GLuint textureName;
+    glReadBuffer(GL_FRONT_AND_BACK);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixmap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixmap);
+    glGenTextures(1, &textureName);
+    glBindTexture(GL_TEXTURE_2D, textureName);
+    img.imgName = textureName;
+    return img;
+}
+
 // Math Functions
 
 float map(float n, float min1, float max1, float min2, float max2) {
