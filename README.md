@@ -27,6 +27,9 @@ Current features:
     * endsWith(checks if char array ends with another char array)
     * startsWith(checks if char array starts with another char array)
     * Text(prints out text at wanted coordinates, it's colored by fill color)
+    * noFill(Sets the fill color's alpha to 0)
+    * noStroke(Sets the stroke color's alpha to 0)
+    * noise(function accepts 1(1D), 2(2D) or 3(3D) arguments)
   * not working curtasy of C language properties:
     * print(not working because you can't concatenate two strings with operator +)
     * println(not working because you can't concatenate two strings with operator +)
