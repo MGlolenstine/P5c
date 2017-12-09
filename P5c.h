@@ -41,13 +41,17 @@ const int P3D = 1;
 
 // Functions
 
+
+void setup() __attribute__((weak));
+void draw() __attribute__((weak));
+void mousePressed() __attribute__((weak));
+void mouseReleased() __attribute__((weak));
+void keyPressed() __attribute__((weak));
+void keyReleased() __attribute__((weak));
+
 void KeyPressed();
 
-void draw();
-
 void display();
-
-void setup();
 
 void size(int w_, int h_, int mode);
 
@@ -74,18 +78,6 @@ void pushMatrix();
 void translate(int x, int y, int z);
 
 // Event functions
-void (*st)() = nullptr;
-
-void (*dr)() = nullptr;
-
-void (*kp)() = nullptr;
-
-void (*kr)() = nullptr;
-
-void (*mc)() = nullptr;
-
-void (*mr)() = nullptr;
-
 void handleKeypress(unsigned char input, int x, int y);
 
 void handleKeyrelease(unsigned char input, int x, int y);
@@ -338,13 +330,13 @@ int main() {
     iluInit();
     ilutInit();
     ilutRenderer(ILUT_OPENGL);
-    dr = draw;
-    st = setup;
     path = getPath();
     strokeCol = Color(0, 0, 0, 255);
     fillCol = Color(255, 255, 255, 255);
     lastver = PVector(0, 0, 0);
-    (*st)();
+    if(setup){
+        setup();
+    }
     glutMainLoop();
     timeToWait = int(float(1000) / framerate);
     currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -385,11 +377,13 @@ void handleMousePress(int button, int state, int x, int y) {
     mouseY = y;
     mouseButton = button;
     if (state == GLUT_DOWN) {
-        if (mc != nullptr)
-            (*mc)();
+        if(mousePressed){
+            mousePressed();
+        }
     } else {
-        if (mr != nullptr)
-            (*mr)();
+        if(mouseReleased){
+            mouseReleased();
+        }
     }
 }
 
@@ -400,15 +394,16 @@ void handleMousePos(int x, int y) {
 
 void handleKeypress(unsigned char input, int x, int y) {
     key = input;
-    if (kp != nullptr) {
-        (*kp)();
+    if(keyPressed){
+        keyPressed();
     }
 }
 
 void handleKeyrelease(unsigned char input, int x, int y) {
     key = input;
-    if (kr != nullptr)
-        (*kr)();
+    if(keyReleased){
+        keyReleased();
+    }
 }
 
 void handleResize(int w, int h) {
@@ -448,7 +443,9 @@ void display() {
             currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now().time_since_epoch()).count();
             glMatrixMode(GL_MODELVIEW);
-            (*dr)();
+            if(draw){
+                draw();
+            }
             glFlush();
             glutPostRedisplay();
             break;
@@ -540,7 +537,6 @@ void rect(float x, float y, float w, float h) {
     glVertex3d(w, 0, 0);
     glEnd();
     // Draw stroke
-    //glColor4d(strokeCol.r, strokeCol.g, strokeCol.b, strokeCol.a);
     glColor4f((float) strokeCol.r / (float) 256, (float) strokeCol.g / (float) 256, (float) strokeCol.b / (float) 256,
               (float) strokeCol.a / (float) 256);
     glLineWidth(strokeweight);
@@ -694,7 +690,7 @@ void noStroke() {
 
 PImage loadPixels(){
     PImage img = PImage(width, height);
-    auto *pixmap=(GLubyte *)malloc(width*height*4);
+    auto *pixmap=(GLubyte *)malloc((size_t)width * height * 4);
     GLuint textureName;
     glReadBuffer(GL_FRONT_AND_BACK);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixmap);
@@ -802,22 +798,6 @@ std::string dataDirectory(const char input[] = "") {
 }
 
 // Re-declaration of event functions
-
-void setMouseClicked(void (*fun)()) {
-    mc = fun;
-}
-
-void setKeyPressed(void (*fun)()) {
-    kp = fun;
-}
-
-void setKeyReleased(void (*fun)()) {
-    kp = fun;
-}
-
-void setMouseReleased(void (*fun)()) {
-    kp = fun;
-}
 
 bool endsWith(const char string[], const char check[]) {
     if (strlen(string) >= strlen(check)) {
