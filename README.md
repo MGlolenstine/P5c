@@ -35,6 +35,11 @@ Current features:
       * keyReleased
       * mousePressed
       * mouseReleased
+    * PString a very general string implementation
+    * print(prints text)
+      * takes PString as an argument, so if you're using normal literals, don't forget adding 's' after quotation marks
+    * println(prints text and goes to new line)
+      * takes PString as an argument, so if you're using normal literals, don't forget adding 's' after quotation marks
   * not working curtasy of C language properties:
     * print(not working because you can't concatenate two strings with operator +)
     * println(not working because you can't concatenate two strings with operator +)     
