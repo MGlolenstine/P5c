@@ -18,7 +18,9 @@ Current features:
     * endShape
     * vertex
     * dataDirectory(gives you path to folder data inside of running directory)
+      * currently only working on Linux, multiplatform using P5c IDE
     * sketchDirectory(gives you path to running directory)
+      * currently only working on Linux, multiplatform using P5c IDE
     * PVector
     * Color
     * PImage
@@ -40,6 +42,3 @@ Current features:
       * takes PString as an argument, so if you're using normal literals, don't forget adding 's' after quotation marks
     * println(prints text and goes to new line)
       * takes PString as an argument, so if you're using normal literals, don't forget adding 's' after quotation marks
-  * not working curtasy of C language properties:
-    * print(not working because you can't concatenate two strings with operator +)
-    * println(not working because you can't concatenate two strings with operator +)     
