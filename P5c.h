@@ -27,6 +27,7 @@ const int P3D = 1;
 #include <png.h>
 #include <jpeglib.h>
 #include <cstring>
+#include <utility>
 #include <vector>
 #include <cstdlib>
 #include <malloc.h>
@@ -292,6 +293,74 @@ public:
         height = 0;
     }
 };
+
+class PString{
+    std::string text;
+public:
+    PString(){}
+
+    explicit PString(std::string s){
+        text = std::move(s);
+    }
+
+    PString operator+(const char* tmp){
+        return PString(text+std::string(tmp));
+    }
+    PString operator+(int tmp){
+        return PString(text+std::to_string(tmp));
+    }
+    PString operator+(float tmp){
+        return PString(text+std::to_string(tmp));
+    }
+    PString operator+(char tmp){
+        return PString(text+std::to_string(tmp));
+    }
+    PString operator+(std::string tmp){
+        return PString(text+tmp);
+    }
+    PString operator+(bool tmp){
+        std::string str;
+        if(tmp){
+            str = "True";
+        }else{
+            str = "False";
+        }
+        return PString(text+str);
+    }
+    PString& operator=(const char* tmp){
+        text = (std::string(tmp));
+    }
+    PString& operator=(int tmp){
+        text = (std::to_string(tmp));
+    }
+    PString& operator=(float tmp){
+        text = (std::to_string(tmp));
+    }
+    PString& operator=(char tmp){
+        text = (std::to_string(tmp));
+    }
+    PString& operator=(std::string tmp){
+        text = (std::move(tmp));
+    }
+    PString& operator=(bool tmp){
+        if(tmp){
+            text = ("True");
+        }else{
+            text = ("False");
+        }
+    }
+    std::string getText(){
+        return text;
+    }
+private:
+    void pushBack(std::string s){
+        text+=s;
+    }
+};
+
+PString operator"" s(const char* text, std::size_t len) {
+    return PString(std::string(text, len));
+}
 
 // Variables
 int width;
@@ -797,6 +866,12 @@ std::string dataDirectory(const char input[] = "") {
     return tmp;
 }
 
+void print(PString str){
+    std::cout<<str.getText();
+}
+void println(PString str){
+    std::cout<<str.getText()<<std::endl;
+}
 // Re-declaration of event functions
 
 bool endsWith(const char string[], const char check[]) {
