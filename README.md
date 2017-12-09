@@ -30,13 +30,11 @@ Current features:
     * noFill(Sets the fill color's alpha to 0)
     * noStroke(Sets the stroke color's alpha to 0)
     * noise(function accepts 1(1D), 2(2D) or 3(3D) arguments)
+    * event functions
+      * keyPressed
+      * keyReleased
+      * mousePressed
+      * mouseReleased
   * not working curtasy of C language properties:
     * print(not working because you can't concatenate two strings with operator +)
-    * println(not working because you can't concatenate two strings with operator +)
-    * event functions(they do work, but you have to set them first in the setup)
-      * keyPressed(can be set with setKeyPressed)
-      * keyReleased(can be set with setKeyReleased)
-      * mousePressed(can be set with setMousePressed)
-      * mouseReleased(can be set with setMouseReleased)
-      
-      
+    * println(not working because you can't concatenate two strings with operator +)     
