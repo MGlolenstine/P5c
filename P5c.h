@@ -297,7 +297,7 @@ public:
 class PString{
     std::string text;
 public:
-    PString(){}
+    PString() = default;
 
     explicit PString(std::string s){
         text = std::move(s);
@@ -315,7 +315,10 @@ public:
     PString operator+(char tmp){
         return PString(text+std::to_string(tmp));
     }
-    PString operator+(std::string tmp){
+    PString operator+(double tmp){
+        return PString(text+std::to_string(tmp));
+    }
+    PString operator+(const std::string &tmp){
         return PString(text+tmp);
     }
     PString operator+(bool tmp){
@@ -339,6 +342,9 @@ public:
     PString& operator=(char tmp){
         text = (std::to_string(tmp));
     }
+    PString& operator=(double tmp){
+        text = (std::to_string(tmp));
+    }
     PString& operator=(std::string tmp){
         text = (std::move(tmp));
     }
@@ -353,7 +359,7 @@ public:
         return text;
     }
 private:
-    void pushBack(std::string s){
+    void pushBack(const std::string &s){
         text+=s;
     }
 };
