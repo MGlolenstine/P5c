@@ -11,6 +11,7 @@
 #pragma weak keyReleased
 #pragma weak mouseClicked
 #pragma weak mouseReleased
+#pragma comment(lib, "glut32.lib")
 
 #ifndef P5C_H
 #define P5C_H
@@ -18,14 +19,13 @@
 const int CLOSE = 1;
 const int P3D = 1;
 
-#include <wait.h>
 #include <chrono>
 #include <GL/freeglut.h>
+#include <GL/freeglut_std.h>
+#include <GL/freeglut_ext.h>
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <png.h>
-#include <jpeglib.h>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -35,6 +35,7 @@ const int P3D = 1;
 #include <sys/param.h>
 #include <libgen.h>
 #include <IL/il.h>
+#include <IL/ilu.h>
 #include <IL/ilut.h>
 #include <sstream>
 #include <algorithm>
@@ -42,12 +43,18 @@ const int P3D = 1;
 
 // Functions
 
+//TODO: Fix text coloring - only 0 or 255 atm
 
 void setup() __attribute__((weak));
+
 void draw() __attribute__((weak));
+
 void mousePressed() __attribute__((weak));
+
 void mouseReleased() __attribute__((weak));
+
 void keyPressed() __attribute__((weak));
+
 void keyReleased() __attribute__((weak));
 
 void KeyPressed();
@@ -96,7 +103,18 @@ std::string getPath();
 
 std::string getFolder(std::string fullPath);
 
+std::string sketchDirectory(const char input[]);
+
 bool endsWith(const char string[], const char check[]);
+
+class PString;
+
+void println(PString str);
+
+PString operator "" s(const char *text, std::size_t len);
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCDFAInspection"
 
 // Classes
 class Color {
@@ -134,6 +152,8 @@ public:
         a = a_;
     }
 };
+
+#pragma clang diagnostic pop
 
 class PVector {
 public:
@@ -206,14 +226,15 @@ public:
         z = z / a;
     }
 
-    void limit(float max){
-        if(magSq() > max*max) {
+    void limit(float max) {
+        if (magSq() > max * max) {
             normalize();
             mult(max);
         }
     }
-    float magSq(){
-        return (x*x+y*y+z*z);
+
+    float magSq() {
+        return (x * x + y * y + z * z);
     }
 };
 
@@ -229,52 +250,24 @@ public:
         imgName = 0;
         width = 64;
         height = 64;
-        Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(0, 0, 0, 0));
-        for (Color c : tmppixels) {
-            pixels.push_back(c);
-        }
     }
 
     PImage(int width_, int height_) {
         imgName = 0;
         width = width_;
         height = height_;
-        Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(0, 0, 0, 0));
-        for (Color c : tmppixels) {
-            pixels.push_back(c);
-        }
     }
 
     PImage(int width_, int height_, int r_, int g_, int b_) {
         imgName = 0;
         width = width_;
         height = height_;
-        Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(r_, g_, b_, 255));
-        for (Color c : tmppixels) {
-            pixels.push_back(c);
-        }
     }
 
     PImage(int width_, int height_, int r_, int g_, int b_, int a_) {
         imgName = 0;
         width = width_;
         height = height_;
-        Color tmppixels[width * height];
-        std::fill_n(tmppixels, width * height, Color(r_, g_, b_, a_));
-        for (Color c : tmppixels) {
-            pixels.push_back(c);
-        }
-    }
-
-    void setPixel(int x, int y, int r, int g = 256, int b = 256, int a = 255) {
-        if (g > 255 || b > 255) {
-            g = r;
-            b = r;
-        }
-        pixels.at(static_cast<unsigned long>(x + y * width)) = Color(r, g, b, a); // NOLINT
     }
 
     void flip() {
@@ -287,92 +280,154 @@ public:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, IL_RGBA, GL_UNSIGNED_BYTE, ilGetData());
     }
 
-    void empty(){
-        pixels.clear();
+    void empty() {
+        //pixels.clear();
         width = 0;
         height = 0;
     }
 };
 
-class PString{
+class PString {
     std::string text;
 public:
     PString() = default;
 
-    explicit PString(std::string s){
+    explicit PString(std::string s) {
         text = std::move(s);
     }
 
-    PString operator+(const char* tmp){
-        return PString(text+std::string(tmp));
+    PString operator+(const char *tmp) {
+        return PString(text + std::string(tmp));
     }
-    PString operator+(int tmp){
-        return PString(text+std::to_string(tmp));
+
+    PString operator+(int tmp) {
+        return PString(text + std::to_string(tmp));
     }
-    PString operator+(float tmp){
-        return PString(text+std::to_string(tmp));
+
+    PString operator+(float tmp) {
+        return PString(text + std::to_string(tmp));
     }
-    PString operator+(char tmp){
-        return PString(text+std::to_string(tmp));
+
+    PString operator+(char tmp) {
+        std::ostringstream os;
+        os << tmp;
+        std::string str = os.str();
+        return PString(text + str);
     }
-    PString operator+(double tmp){
-        return PString(text+std::to_string(tmp));
+
+    PString operator+(double tmp) {
+        return PString(text + std::to_string(tmp));
     }
-    PString operator+(const std::string &tmp){
-        return PString(text+tmp);
+
+    PString operator+(long tmp) {
+        return PString(text + std::to_string(tmp));
     }
-    PString operator+(bool tmp){
+
+    PString operator+(const std::string &tmp) {
+        return PString(text + tmp);
+    }
+
+    PString operator+(PString &tmp) {
+        return PString(text + tmp.text);
+    }
+
+    PString operator+(bool tmp) {
         std::string str;
-        if(tmp){
+        if (tmp) {
             str = "True";
-        }else{
+        } else {
             str = "False";
         }
-        return PString(text+str);
+        return PString(text + str);
     }
-    PString& operator=(const char* tmp){
+
+    PString &operator=(const char *tmp) {
         text = (std::string(tmp));
     }
-    PString& operator=(int tmp){
+
+    PString &operator=(int tmp) {
         text = (std::to_string(tmp));
     }
-    PString& operator=(float tmp){
+
+    PString &operator=(float tmp) {
         text = (std::to_string(tmp));
     }
-    PString& operator=(char tmp){
+
+    PString &operator=(char tmp) {
+        std::ostringstream os;
+        os << tmp;
+        std::string str = os.str();
+        text = str;
+        //text = (std::to_string(tmp));
+    }
+
+    PString &operator=(double tmp) {
         text = (std::to_string(tmp));
     }
-    PString& operator=(double tmp){
-        text = (std::to_string(tmp));
-    }
-    PString& operator=(std::string tmp){
+
+    PString &operator=(std::string tmp) {
         text = (std::move(tmp));
     }
-    PString& operator=(bool tmp){
-        if(tmp){
+
+    PString &operator=(const PString &tmp) {
+        text = tmp.text;
+    }
+
+    PString &operator=(bool tmp) {
+        if (tmp) {
             text = ("True");
-        }else{
+        } else {
             text = ("False");
         }
     }
-    std::string getText(){
+
+    std::string getText() {
         return text;
     }
+
+    PString substr(int beginIndex, int length){
+        return PString(text.substr(beginIndex, length));
+    }
+
+    int length(){
+        return static_cast<int>(text.length());
+    }
+
+    std::vector<PString> split(char regex){
+        std::vector<PString> vps;
+        std::string tmp = text;
+        int prevIndex = 0;
+        for(int i = 0; i < tmp.length(); i++){
+            if(tmp.at(i) != ' ' && tmp.at(i) == regex){
+                std::string news = tmp.substr(prevIndex, i-prevIndex);
+                vps.emplace_back(news);
+                prevIndex = i+1;
+            }
+        }
+        std::string news = tmp.substr(prevIndex, tmp.length()-prevIndex);
+        vps.emplace_back(news);
+        return vps;
+    }
+
 private:
-    void pushBack(const std::string &s){
-        text+=s;
+    void pushBack(const std::string &s) {
+        text += s;
     }
 };
 
-PString operator"" s(const char* text, std::size_t len) {
+PString operator "" s(const char *text, std::size_t len) {
     return PString(std::string(text, len));
 }
+
+void println(PString str);
+
+long millis();
 
 // Variables
 int width;
 int height;
 int window;
-int key;
+char key;
 int keyCode;
 int mouseX;
 int mouseY;
@@ -388,7 +443,8 @@ std::string path = ""; // NOLINT
 
 int framerate = 60;
 int timeToWait;
-long currentTime;
+//long long int currentTime;
+std::chrono::milliseconds currentTime;
 const char *title = nullptr;
 Color last; // NOLINT
 
@@ -405,18 +461,17 @@ int main() {
     iluInit();
     ilutInit();
     ilutRenderer(ILUT_OPENGL);
-    path = getPath();
     strokeCol = Color(0, 0, 0, 255);
     fillCol = Color(255, 255, 255, 255);
     lastver = PVector(0, 0, 0);
-    if(setup){
+    timeToWait = int(float(1000) / framerate);
+    currentTime = (std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()));
+    srand(static_cast<unsigned int>(time(nullptr)));
+    if (setup) {
         setup();
     }
     glutMainLoop();
-    timeToWait = int(float(1000) / framerate);
-    currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-    srand(static_cast<unsigned int>(currentTime));
 }
 
 // Window related functions
@@ -435,7 +490,7 @@ void size(int w_, int h_, int mode = -1) {
     } else {
         window = glutCreateWindow(strdup(title));
     }
-    if(mode == 1){
+    if (mode == 1) {
         glMatrixMode(GL_MODELVIEW);
     }
     glutReshapeFunc(handleResize);
@@ -452,11 +507,11 @@ void handleMousePress(int button, int state, int x, int y) {
     mouseY = y;
     mouseButton = button;
     if (state == GLUT_DOWN) {
-        if(mousePressed){
+        if (mousePressed) {
             mousePressed();
         }
     } else {
-        if(mouseReleased){
+        if (mouseReleased) {
             mouseReleased();
         }
     }
@@ -468,15 +523,17 @@ void handleMousePos(int x, int y) {
 }
 
 void handleKeypress(unsigned char input, int x, int y) {
-    key = input;
-    if(keyPressed){
+    key = (char)input;
+    keyCode = input;
+    if (keyPressed) {
         keyPressed();
     }
 }
 
 void handleKeyrelease(unsigned char input, int x, int y) {
     key = input;
-    if(keyReleased){
+    keyCode = input;
+    if (keyReleased) {
         keyReleased();
     }
 }
@@ -514,11 +571,11 @@ void display() {
     }
     while (true) {
         if (std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count() >= currentTime + timeToWait) {
+                std::chrono::system_clock::now().time_since_epoch()).count() > currentTime.count() + timeToWait) {
             currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count();
+                    std::chrono::system_clock::now().time_since_epoch());
             glMatrixMode(GL_MODELVIEW);
-            if(draw){
+            if (draw) {
                 draw();
             }
             glFlush();
@@ -564,7 +621,7 @@ void vertex(float x, float y, float z = 0) {
     if (counterV == 1) {
         lastver = PVector(x, y, z);
     }
-    glColor3f((float)fillCol.r/255, (float)fillCol.g/255, (float)fillCol.b/255);
+    glColor3f((float) fillCol.r / 255, (float) fillCol.g / 255, (float) fillCol.b / 255);
     glVertex3d(x, y, z);
 }
 
@@ -677,7 +734,7 @@ void fill(int r, int g = 256, int b = 256, int a = 255) {
     fillCol = Color(r, g, b, a);
 }
 
-void fill(Color color){
+void fill(Color color) {
     fillCol = color;
 }
 
@@ -716,11 +773,12 @@ void image(PImage img, int x, int y, int w = -1, int h = -1) {
 }
 
 PImage loadImage(const char url[]) {
-    std::string s = getPath() + "/" + url;
-    boolean loaded = ilLoadImage(s.c_str());
+    std::string s = url;
+    bool loaded = ilLoadImage(s.c_str());
 
     if (!loaded) {
         puts("Not loaded!");
+        std::cout << ilGetError() << std::endl;
         std::cout << "Error: " << iluErrorString(ilGetError()) << std::endl;
         return PImage();
     }
@@ -745,10 +803,25 @@ void text(char c[], int x, int y) {
     glColor3d(fillCol.r, fillCol.g, fillCol.b);
     glRasterPos2d(x, y);
     for (int i = 0; i < strlen(c); i++) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, c[i]);
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, c[i]);
     }
     popMatrix();
 
+}
+
+void text(PString string, int x, int y) {
+    y = height - y;
+    pushMatrix();
+    glColor3d(fillCol.r, fillCol.g, fillCol.b);
+    glRasterPos2d(x, y);
+    for (unsigned long i = 0; i < string.getText().length(); i++) {
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, string.getText().at(i));
+    }
+    popMatrix();
+}
+
+int textWidth(PString string) {
+    return static_cast<int>(string.getText().length() * 9);
 }
 
 long millis() {
@@ -763,9 +836,9 @@ void noStroke() {
     strokeCol.a = 0;
 }
 
-PImage loadPixels(){
+PImage loadPixels() {
     PImage img = PImage(width, height);
-    auto *pixmap=(GLubyte *)malloc((size_t)width * height * 4);
+    auto *pixmap = (GLubyte *) malloc((size_t) width * height * 4);
     GLuint textureName;
     glReadBuffer(GL_FRONT_AND_BACK);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixmap);
@@ -783,14 +856,6 @@ float map(float n, float min1, float max1, float min2, float max2) {
 }
 
 float random(int min, int max = 0) {
-    tm localTime{};
-    std::chrono::system_clock::time_point t = std::chrono::system_clock::now();
-    time_t now = std::chrono::system_clock::to_time_t(t);
-    localtime_r(&now, &localTime);
-
-    const std::chrono::duration<double> tse = t.time_since_epoch();
-    std::chrono::seconds::rep milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(tse).count() % 1000;
-    srand(static_cast<unsigned int>(milliseconds + rand() % 100)); // NOLINT
     if (min > max) {
         max = min;
         min = 0;
@@ -799,16 +864,21 @@ float random(int min, int max = 0) {
     return random;
 }
 
-double dist(float a1, float a2, float a3, float a4, float a5 = NULL, float a6 = NULL) {
-    if (a5 == NULL || a6 == NULL) {
-        // distance in 2d
-        return std::sqrt(pow(a3 - a1, 2) + pow(a4 - a2, 2));
-    } else {
-        //distance in 3d
-        return std::sqrt(pow(a1 - a4, 2) + pow(a2 - a5, 2) + pow(a3 - a6, 2));
-    }
+double dist(float a1, float a2, float a3, float a4) {
+    // distance in 2d
+    return std::sqrt(pow(a3 - a1, 2) + pow(a4 - a2, 2));
 }
 
+double dist(float a1, float a2, float a3, float a4, float a5, float a6) {
+    //distance in 3d
+    return std::sqrt(pow(a1 - a4, 2) + pow(a2 - a5, 2) + pow(a3 - a6, 2));
+}
+
+
+double dist(PVector a, PVector b) {
+    // distance in 3d between two PVectors
+    return std::abs(std::sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2) + pow(a.z - b.z, 2)));
+}
 // Coordinate system functions
 
 void translate(int x, int y, int z = 0) {
@@ -826,57 +896,12 @@ void popMatrix() {
 
 // Much appreciated functions
 
-std::string getPath() {
-    std::string final = std::string("");
-    // Windows
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-    int bytes = GetModuleFileName(NULL, pBuf, len);
-    if (bytes == 0)
-        return -1;
-    else
-        return bytes;
-#endif
-    // Linux
-#ifdef __unix__
-    char result[PATH_MAX];
-    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-    final = std::string(result, static_cast<unsigned long>((count > 0) ? count : 0));
-#endif
-    return getFolder(final);
+void print(PString str) {
+    std::cout << str.getText();
 }
 
-std::string getFolder(std::string fullPath) {
-    if (fullPath.length() > 0) {
-        char sep = '/';
-        std::string s = fullPath.substr(1);
-        int length = 0;
-        for (size_t p = 0, q = 0; p != s.npos; p = q) {
-            length = int(s.substr(p + (p != 0), (q = s.find(sep, p + 1)) - p - (p != 0)).length());
-        }
-        std::string final = fullPath.substr(1, fullPath.length() - length);
-        return fullPath.substr(0, fullPath.length() - length);
-    }
-    return fullPath;
-}
-
-std::string sketchDirectory(const char input[] = "") {
-    std::string tmp = path;
-    tmp += input;
-    return tmp;
-}
-
-std::string dataDirectory(const char input[] = "") {
-    std::string tmp = path;
-    tmp += "data/";
-    tmp.operator+=(input);
-    return tmp;
-}
-
-void print(PString str){
-    std::cout<<str.getText();
-}
-void println(PString str){
-    std::cout<<str.getText()<<std::endl;
+void println(PString str) {
+    std::cout << str.getText() << std::endl;
 }
 // Re-declaration of event functions
 
